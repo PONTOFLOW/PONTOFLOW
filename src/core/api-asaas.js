@@ -239,6 +239,129 @@ export function createAsaasHandlers() {
     },
 
     /**
+     * Configuração Rápida do Asaas (Modo Sandbox / Demonstração)
+     * Ativa a integração com chave simulada e dados iniciais de cobrança
+     */
+    async asaasQuickSetup(args = []) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+
+      const cleanKey = "simulado_token_asaas_pontoflow";
+      const cleanAmbiente = "sandbox";
+      const email = profile.Email || "glleucekk77@gmail.com";
+
+      const record = {
+        Chave: "Asaas",
+        ConfigID: "Asaas",
+        ApiKey: cleanKey,
+        Ambiente: cleanAmbiente,
+        EmailNotificacao: email,
+        WebhookToken: "whsec_pontoflow_demo",
+        WebhookAtivo: true,
+        UltimaAtualizacao: nowIso(),
+      };
+
+      await runtime.upsert("Configuracoes", record);
+
+      // Popula dados demonstrativos se a tabela de cobranças estiver vazia
+      const cobrancasExistentes = (await runtime.list("AsaasCobrancas").catch(() => [])) || [];
+      if (!cobrancasExistentes.length) {
+        const demoCharges = [
+          {
+            CobrancaID: "cob_demo_01",
+            AsaasPaymentID: "pay_demo_01",
+            ClienteNome: "Padaria e Confeitaria Central Ltda",
+            ClienteEmail: "financeiro@padariacentral.com.br",
+            ClienteCpfCnpj: "12345678000190",
+            ClienteTelefone: "71997069291",
+            Plano: "Start",
+            Valor: 67.0,
+            FormaPagamento: "PIX",
+            Status: "RECEIVED",
+            Vencimento: nowIso().slice(0, 10),
+            InvoiceUrl: "https://sandbox.asaas.com/i/pay_demo_01",
+            CriadoEm: nowIso(),
+          },
+          {
+            CobrancaID: "cob_demo_02",
+            AsaasPaymentID: "pay_demo_02",
+            ClienteNome: "Hamburgueria & Restaurante House",
+            ClienteEmail: "financeiro@house.com.br",
+            ClienteCpfCnpj: "98765432000110",
+            ClienteTelefone: "71997069291",
+            Plano: "Pro",
+            Valor: 127.0,
+            FormaPagamento: "PIX",
+            Status: "RECEIVED",
+            Vencimento: nowIso().slice(0, 10),
+            InvoiceUrl: "https://sandbox.asaas.com/i/pay_demo_02",
+            CriadoEm: nowIso(),
+          },
+          {
+            CobrancaID: "cob_demo_03",
+            AsaasPaymentID: "pay_demo_03",
+            ClienteNome: "Rede Supermercados Bahia Sul",
+            ClienteEmail: "contato@bahiasul.com.br",
+            ClienteCpfCnpj: "45123789000155",
+            ClienteTelefone: "71997069291",
+            Plano: "Enterprise",
+            Valor: 197.0,
+            FormaPagamento: "BOLETO",
+            Status: "PENDING",
+            Vencimento: nowIso().slice(0, 10),
+            InvoiceUrl: "https://sandbox.asaas.com/i/pay_demo_03",
+            CriadoEm: nowIso(),
+          },
+        ];
+
+        for (const c of demoCharges) {
+          await runtime.upsert("AsaasCobrancas", c);
+        }
+      }
+
+      const assinaturasExistentes = (await runtime.list("AsaasAssinaturas").catch(() => [])) || [];
+      if (!assinaturasExistentes.length) {
+        const demoSubs = [
+          {
+            AssinaturaID: "sub_demo_01",
+            AsaasSubscriptionID: "sub_demo_01",
+            ClienteNome: "Padaria e Confeitaria Central Ltda",
+            Plano: "Start",
+            Valor: 67.0,
+            Status: "ACTIVE",
+            FormaPagamento: "PIX",
+            Ciclo: "MENSAL",
+            CriadoEm: nowIso(),
+          },
+          {
+            AssinaturaID: "sub_demo_02",
+            AsaasSubscriptionID: "sub_demo_02",
+            ClienteNome: "Hamburgueria & Restaurante House",
+            Plano: "Pro",
+            Valor: 127.0,
+            Status: "ACTIVE",
+            FormaPagamento: "PIX",
+            Ciclo: "MENSAL",
+            CriadoEm: nowIso(),
+          },
+        ];
+        for (const s of demoSubs) {
+          await runtime.upsert("AsaasAssinaturas", s);
+        }
+      }
+
+      await audit("Configuração Rápida Asaas Concluída", {
+        ambiente: cleanAmbiente,
+        configurado: true,
+      });
+
+      return success({
+        mensagem: "Integração Asaas configurada com sucesso em modo Sandbox com dados demonstrativos.",
+        ambiente: cleanAmbiente,
+      });
+    },
+
+    /**
      * Cria ou localiza um cliente no Asaas
      */
     async asaasCustomerCreateOrGet(args) {
@@ -476,6 +599,20 @@ export function createAsaasHandlers() {
       }
 
       filtered.sort((a, b) => new Date(b.CriadoEm || 0) - new Date(a.CriadoEm || 0));
+
+      const assinaturas = (await runtime.list("AsaasAssinaturas").catch(() => [])) || [];
+      const totalRecebido = list
+        .filter((c) => c.Status === "RECEIVED" || c.Status === "CONFIRMED")
+        .reduce((sum, c) => sum + (Number(c.Valor) || 0), 0);
+      const pendentes = list.filter((c) => c.Status === "PENDING").length;
+      const totalAssinaturas = assinaturas.filter((s) => s.Status === "ACTIVE").length;
+
+      filtered.cobrancas = filtered;
+      filtered.estatisticas = {
+        totalRecebido,
+        pendentes,
+        totalAssinaturas,
+      };
 
       return success(filtered);
     },

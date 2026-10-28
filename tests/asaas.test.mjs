@@ -178,6 +178,65 @@ test("Asaas Integration: ciclo completo de clientes, cobrança PIX, assinatura e
   }
 });
 
+test("Asaas Integration: asaasQuickSetup inicializa ambiente Sandbox com dados demonstrativos", async () => {
+  const tables = new Map();
+  const getTable = (name) => {
+    if (!tables.has(name)) tables.set(name, new Map());
+    return tables.get(name);
+  };
+
+  const originalMethods = {
+    getById: runtime.getById,
+    list: runtime.list,
+    upsert: runtime.upsert,
+    requireProfile: runtime.requireProfile,
+  };
+
+  runtime.getById = async (table, id) => getTable(table).get(String(id)) || null;
+  runtime.list = async (table) => [...getTable(table).values()];
+  runtime.upsert = async (table, record) => {
+    const idKey =
+      table === "Configuracoes"
+        ? "Chave"
+        : table === "AsaasCobrancas"
+        ? "CobrancaID"
+        : table === "AsaasAssinaturas"
+        ? "AssinaturaID"
+        : "id";
+    const id = String(record[idKey] || record.id || `rec_${Date.now()}`);
+    const saved = { ...record, [idKey]: id };
+    getTable(table).set(id, saved);
+    return saved;
+  };
+  runtime.requireProfile = async () => ({
+    Perfil: "Administrador",
+    Email: "glleucekk77@gmail.com",
+  });
+
+  try {
+    const handlers = createAsaasHandlers();
+    const quickRes = await handlers.asaasQuickSetup([]);
+    assert.equal(quickRes.success, true);
+    assert.equal(quickRes.data.ambiente, "sandbox");
+
+    const config = await handlers.asaasConfigGet();
+    assert.equal(config.data.configurado, true);
+    assert.equal(config.data.ambiente, "sandbox");
+
+    const listRes = await handlers.asaasPaymentList([]);
+    assert.equal(listRes.success, true);
+    assert.equal(listRes.data.length, 3);
+    assert.equal(listRes.data.estatisticas.totalRecebido, 194);
+    assert.equal(listRes.data.estatisticas.pendentes, 1);
+    assert.equal(listRes.data.estatisticas.totalAssinaturas, 2);
+  } finally {
+    runtime.getById = originalMethods.getById;
+    runtime.list = originalMethods.list;
+    runtime.upsert = originalMethods.upsert;
+    runtime.requireProfile = originalMethods.requireProfile;
+  }
+});
+
 test("ZERO EMOJIS: Verificação estrita nos novos arquivos do Asaas", async () => {
   const asaasCode = await readFile(
     new URL("../src/core/api-asaas.js", import.meta.url),

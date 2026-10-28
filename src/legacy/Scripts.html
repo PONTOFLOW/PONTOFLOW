@@ -161,6 +161,7 @@
     waGetHistory: "getWhatsAppHistory",
     asaasConfigGet: "asaasConfigGet",
     asaasConfigSave: "asaasConfigSave",
+    asaasQuickSetup: "asaasQuickSetup",
     asaasCustomerCreateOrGet: "asaasCustomerCreateOrGet",
     asaasPaymentCreate: "asaasPaymentCreate",
     asaasSubscriptionCreate: "asaasSubscriptionCreate",
@@ -10005,18 +10006,27 @@
       const ambiente = configRes?.ambiente || "sandbox";
       const maskedKey = configRes?.apiKeyMascarada || "Nao configurada";
 
-      // 2. Atualiza cabecalho de status
+      // 2. Atualiza cabecalho de status e banners
       const badgeEl = $("#asaasStatusBadge");
+      const notConfiguredBanner = $("#asaasNotConfiguredBanner");
+      const quickBtn = $("#asaasQuickSetupBtn");
+
       if (badgeEl) {
         if (!isConfigured) {
           badgeEl.className = "badge badge-neutral";
           badgeEl.textContent = "Nao configurado";
+          if (notConfiguredBanner) notConfiguredBanner.style.display = "flex";
+          if (quickBtn) quickBtn.textContent = "Configurar Tudo com 1 Clique (Sandbox)";
         } else if (isSimulado) {
           badgeEl.className = "badge badge-warning";
-          badgeEl.textContent = "Modo Simulado";
+          badgeEl.textContent = "Modo Sandbox (Ativo)";
+          if (notConfiguredBanner) notConfiguredBanner.style.display = "none";
+          if (quickBtn) quickBtn.textContent = "Restaurar Dados Demo (Sandbox)";
         } else {
           badgeEl.className = "badge badge-success";
-          badgeEl.textContent = "Conectado";
+          badgeEl.textContent = "Conectado (Producao)";
+          if (notConfiguredBanner) notConfiguredBanner.style.display = "none";
+          if (quickBtn) quickBtn.textContent = "Restaurar Dados Demo (Sandbox)";
         }
       }
 
@@ -10098,6 +10108,38 @@
         refreshBtn.onclick = () => {
           loadAsaasBillingView();
           toast("Dados financeiros do Asaas atualizados.");
+        };
+      }
+
+      // 9.1 Botoes de Configuracao Rapida (Sandbox / Demo)
+      const runQuickSetup = async () => {
+        setLoading(true);
+        try {
+          const res = await call(FN.asaasQuickSetup);
+          toast(res?.mensagem || "Tudo configurado! Ambiente Sandbox ativado.");
+          await loadAsaasBillingView();
+        } catch (err) {
+          toast(err.message || "Erro ao configurar Asaas.", true);
+        } finally {
+          setLoading(false);
+        }
+      };
+      if (quickBtn) quickBtn.onclick = runQuickSetup;
+      const bannerQuickBtn = $("#asaasBannerQuickSetupBtn");
+      if (bannerQuickBtn) bannerQuickBtn.onclick = runQuickSetup;
+
+      const fillDemoBtn = $("#asaasFillDemoConfigBtn");
+      if (fillDemoBtn) {
+        fillDemoBtn.onclick = () => {
+          const keyInput = $("#asaasConfigApiKey");
+          if (keyInput) keyInput.value = "simulado_token_asaas_pontoflow";
+          const envSelect = $("#asaasConfigAmbiente");
+          if (envSelect) envSelect.value = "sandbox";
+          const emailInput = $("#asaasConfigEmailNotificacao");
+          if (emailInput && !emailInput.value) emailInput.value = "glleucekk77@gmail.com";
+          const tokenInput = $("#asaasConfigWebhookToken");
+          if (tokenInput) tokenInput.value = "whsec_pontoflow_demo";
+          toast("Campos preenchidos com credenciais Sandbox. Clique em 'Salvar Configurações do Asaas'.");
         };
       }
 
@@ -10198,22 +10240,39 @@
 
   async function refreshAsaasPaymentsList_() {
     try {
-      const listRes = await call(FN.asaasPaymentList).catch(() => ({}));
-      const payments = Array.isArray(listRes?.cobrancas) ? listRes.cobrancas : [];
+      const listRes = await call(FN.asaasPaymentList).catch(() => []);
+      const payments = Array.isArray(listRes?.cobrancas)
+        ? listRes.cobrancas
+        : Array.isArray(listRes)
+        ? listRes
+        : [];
       const stats = listRes?.estatisticas || {};
+
+      const totalRecebido = Number(
+        stats.totalRecebido !== undefined
+          ? stats.totalRecebido
+          : payments
+              .filter((c) => c.Status === "RECEIVED" || c.Status === "CONFIRMED")
+              .reduce((sum, c) => sum + (Number(c.Valor) || 0), 0)
+      );
+      const pendentes = Number(
+        stats.pendentes !== undefined
+          ? stats.pendentes
+          : payments.filter((c) => c.Status === "PENDING").length
+      );
+      const assinaturasCount = Number(stats.totalAssinaturas ?? 0);
 
       // Atualiza KPIs
       const kpiTotal = $("#asaasKpiTotalFaturado");
       if (kpiTotal) {
-        const val = Number(stats.totalRecebido || 0);
-        kpiTotal.textContent = "R$ " + val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        kpiTotal.textContent = "R$ " + totalRecebido.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
       const kpiPend = $("#asaasKpiPendentes");
-      if (kpiPend) kpiPend.textContent = String(stats.pendentes || 0);
+      if (kpiPend) kpiPend.textContent = String(pendentes);
 
       const kpiAssin = $("#asaasKpiAssinaturas");
-      if (kpiAssin) kpiAssin.textContent = String(stats.totalAssinaturas || 0);
+      if (kpiAssin) kpiAssin.textContent = String(assinaturasCount);
 
       // Renderiza Tabela
       const tbody = $("#asaasPaymentsTableBody");

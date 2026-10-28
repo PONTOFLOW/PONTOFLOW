@@ -2467,7 +2467,10 @@
                   </div>
                 </div>
               </div>
-              <div style="display:flex; align-items:center; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <button type="button" id="asaasQuickSetupBtn" class="btn btn-accent btn-sm" style="min-height:40px; border-radius:10px; font-weight:700; padding:0 16px; display:inline-flex; align-items:center; gap:6px;">
+                  Configurar Tudo com 1 Clique (Sandbox)
+                </button>
                 <button type="button" id="asaasCopyWebhookBtn" class="btn btn-secondary btn-sm" style="min-height:40px; border-radius:10px; font-weight:600; padding:0 14px; display:inline-flex; align-items:center; gap:6px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   Copiar Webhook URL
@@ -2492,6 +2495,19 @@
 
             <!-- ABA 1: Cobranças & Assinaturas -->
             <div data-asaas-tab-pane="charges" style="display:block;">
+              <!-- Banner de Ativação Rápida quando não configurado -->
+              <div id="asaasNotConfiguredBanner" style="display:none; background:linear-gradient(135deg, #eff6ff, #f8fafc); border:1px solid #bfdbfe; border-radius:16px; padding:18px 20px; margin-bottom:20px; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                <div>
+                  <h4 style="margin:0 0 4px 0; font-size:15px; font-weight:800; color:#1e3a8a;">Ativar Módulo Financeiro do Asaas</h4>
+                  <p style="margin:0; font-size:13px; color:#475569; max-width:540px;">
+                    Clique em &ldquo;Configurar Tudo com 1 Clique&rdquo; para ativar o ambiente Sandbox com dados demonstrativos, simulação de cobranças PIX e histórico em tempo real.
+                  </p>
+                </div>
+                <button type="button" id="asaasBannerQuickSetupBtn" class="btn btn-accent" style="min-height:42px; font-weight:700; border-radius:12px; padding:0 20px;">
+                  Configurar Tudo com 1 Clique
+                </button>
+              </div>
+
               <!-- Summary KPIs -->
               <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:20px;">
                 <div class="panel" style="padding:16px; border-radius:16px; border:1px solid #e2e8f0; background:#fff;">
@@ -2676,9 +2692,24 @@
                     <input type="text" id="asaasConfigWebhookToken" class="form-control" placeholder="token-secreto-de-validacao" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-family:monospace; font-size:13px;" />
                   </div>
 
-                  <button type="submit" id="asaasBtnSaveConfig" class="btn btn-accent" style="min-height:44px; border-radius:12px; font-weight:700; padding:0 24px;">
-                    Salvar Configurações do Asaas
-                  </button>
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; margin-bottom:20px;">
+                    <button type="submit" id="asaasBtnSaveConfig" class="btn btn-accent" style="min-height:44px; border-radius:12px; font-weight:700; padding:0 24px;">
+                      Salvar Configurações do Asaas
+                    </button>
+                    <button type="button" id="asaasFillDemoConfigBtn" class="btn btn-outline" style="min-height:44px; border-radius:12px; font-weight:600; padding:0 18px;">
+                      Preencher Credenciais Sandbox
+                    </button>
+                  </div>
+                  
+                  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-top:14px;">
+                    <strong style="display:block; font-size:13px; color:#0f172a; margin-bottom:6px;">Como obter sua chave oficial de Produção no Asaas:</strong>
+                    <ol style="margin:0; padding-left:18px; font-size:12.5px; color:#64748b; line-height:1.6;">
+                      <li>Acesse sua conta em <strong>asaas.com</strong></li>
+                      <li>Navegue até <strong>Minha Conta &gt; Integrações &gt; Chaves de API</strong></li>
+                      <li>Clique em <strong>Gerar Chave de API</strong> e copie o token que inicia com <code>$aact_</code></li>
+                      <li>Cole no campo acima, selecione <strong>Produção</strong> e clique em <strong>Salvar Configurações</strong>.</li>
+                    </ol>
+                  </div>
                 </form>
               </div>
             </div>
