@@ -170,7 +170,7 @@ test("o aplicativo possui manifesto, ícones e service worker seguros", async ()
 
 test("Projeto independente está 100% isolado da empresa principal", async () => {
   const config = await readFile(new URL("../src/firebase-config.js", import.meta.url), "utf8");
-  assert.match(config, /jornada-conveniencia-5jc-a4829/);
+  assert.match(config, /pontoflow-9635c/);
   assert.match(config, /gestao-folgas\/v2/);
   assert.doesNotMatch(config, /github-737ec/);
 });

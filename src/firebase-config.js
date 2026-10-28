@@ -18,15 +18,16 @@ const isLocal =
   currentHostname.includes("github.io");
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyCcRVuG8v6t3lWAAR1-ligX0Vlb9tq8Lmk",
+  apiKey: "AIzaSyAxtI1DJdERljmITBWSPpcY1jGhZWIudyc",
   authDomain: isLocal
-    ? "jornada-conveniencia-5jc-a4829.firebaseapp.com"
-    : (currentHostname || "jornada-conveniencia-5jc-a4829.web.app"),
-  databaseURL: "https://jornada-conveniencia-5jc-a4829-default-rtdb.firebaseio.com",
-  projectId: "jornada-conveniencia-5jc-a4829",
-  storageBucket: "jornada-conveniencia-5jc-a4829.firebasestorage.app",
-  messagingSenderId: "388348433089",
-  appId: "1:388348433089:web:29bd31f218e43a5b7b7a40",
+    ? "pontoflow-9635c.firebaseapp.com"
+    : (currentHostname || "pontoflow-9635c.web.app"),
+  databaseURL: "https://pontoflow-9635c-default-rtdb.firebaseio.com",
+  projectId: "pontoflow-9635c",
+  storageBucket: "pontoflow-9635c.firebasestorage.app",
+  messagingSenderId: "545952579826",
+  appId: "1:545952579826:web:edec0bf0f5082b7655106b",
+  measurementId: "G-8DD00GL16N",
 };
 
 export const APP_ROOT = "gestao-folgas/v2";
