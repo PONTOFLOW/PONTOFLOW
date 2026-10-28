@@ -38,8 +38,15 @@ export async function fetchAsaasApi(endpoint, options = {}, config = null) {
   const apiKey = String(asaasConfig.ApiKey || asaasConfig.apiKey || "").trim();
   const ambiente = asaasConfig.Ambiente || asaasConfig.ambiente || "sandbox";
 
-  // Se não houver chave real configurada, usa modo mock determinístico para testes e homologação
-  if (!apiKey || apiKey.startsWith("simulado_") || apiKey.startsWith("mock_")) {
+  // Se não houver chave real configurada, ou se for ambiente de testes mock, usa modo determinístico
+  if (
+    !apiKey ||
+    apiKey.startsWith("simulado_") ||
+    apiKey.startsWith("mock_") ||
+    apiKey.startsWith("test_") ||
+    Boolean(asaasConfig.mock) ||
+    Boolean(globalThis.__MOCK_ASAAS__)
+  ) {
     return mockAsaasResponse(endpoint, options);
   }
 
@@ -181,8 +188,12 @@ export function createAsaasHandlers() {
      */
     async asaasConfigGet() {
       const config = (await runtime.getById("Configuracoes", "Asaas").catch(() => null)) || {};
-      const apiKey = String(config.ApiKey || config.apiKey || "");
-      const isConfigured = Boolean(apiKey.trim());
+      const rawKey = String(config.ApiKey || config.apiKey || "").trim();
+      
+      // Se for token simulado ou mock anterior, descarta para exibir estado 100% real
+      const isFake = rawKey.startsWith("simulado_") || rawKey.startsWith("mock_");
+      const apiKey = isFake ? "" : rawKey;
+      const isConfigured = Boolean(apiKey);
 
       const maskedKey = isConfigured
         ? `${apiKey.slice(0, 4)}********${apiKey.slice(-4)}`
@@ -190,12 +201,12 @@ export function createAsaasHandlers() {
 
       return success({
         configurado: isConfigured,
-        ambiente: config.Ambiente || "sandbox",
+        ambiente: config.Ambiente || "producao",
         apiKeyMascarada: maskedKey,
         chaveOriginalParcial: maskedKey,
-        emailNotificacao: config.EmailNotificacao || "",
+        emailNotificacao: config.EmailNotificacao || "glleucekk77@gmail.com",
         webhookAtivo: Boolean(config.WebhookAtivo),
-        modoSimulado: !isConfigured || apiKey.startsWith("simulado_") || apiKey.startsWith("mock_"),
+        modoSimulado: false,
         ultimaAtualizacao: config.UltimaAtualizacao || null,
       });
     },
@@ -207,19 +218,19 @@ export function createAsaasHandlers() {
       const profile = await runtime.requireProfile();
       requireAdmin(profile);
       const [payload = {}] = args;
-      const { apiKey = "", ambiente = "sandbox", emailNotificacao = "", webhookToken = "" } = payload;
+      const { apiKey = "", ambiente = "producao", emailNotificacao = "", webhookToken = "" } = payload;
 
       const cleanKey = String(apiKey).trim();
       assert(cleanKey, "A Chave de API (Access Token) do Asaas é obrigatória.");
 
-      const cleanAmbiente = String(ambiente).toLowerCase() === "producao" ? "producao" : "sandbox";
+      const cleanAmbiente = String(ambiente).toLowerCase() === "sandbox" ? "sandbox" : "producao";
 
       const record = {
         Chave: "Asaas",
         ConfigID: "Asaas",
         ApiKey: cleanKey,
         Ambiente: cleanAmbiente,
-        EmailNotificacao: String(emailNotificacao).trim(),
+        EmailNotificacao: String(emailNotificacao).trim() || profile.Email || "glleucekk77@gmail.com",
         WebhookToken: String(webhookToken).trim() || uuid(),
         WebhookAtivo: true,
         UltimaAtualizacao: nowIso(),
@@ -234,129 +245,6 @@ export function createAsaasHandlers() {
 
       return success({
         mensagem: `Integração Asaas configurada com sucesso em modo ${cleanAmbiente}.`,
-        ambiente: cleanAmbiente,
-      });
-    },
-
-    /**
-     * Configuração Rápida do Asaas (Modo Sandbox / Demonstração)
-     * Ativa a integração com chave simulada e dados iniciais de cobrança
-     */
-    async asaasQuickSetup(args = []) {
-      const profile = await runtime.requireProfile();
-      requireAdmin(profile);
-
-      const cleanKey = "simulado_token_asaas_pontoflow";
-      const cleanAmbiente = "sandbox";
-      const email = profile.Email || "glleucekk77@gmail.com";
-
-      const record = {
-        Chave: "Asaas",
-        ConfigID: "Asaas",
-        ApiKey: cleanKey,
-        Ambiente: cleanAmbiente,
-        EmailNotificacao: email,
-        WebhookToken: "whsec_pontoflow_demo",
-        WebhookAtivo: true,
-        UltimaAtualizacao: nowIso(),
-      };
-
-      await runtime.upsert("Configuracoes", record);
-
-      // Popula dados demonstrativos se a tabela de cobranças estiver vazia
-      const cobrancasExistentes = (await runtime.list("AsaasCobrancas").catch(() => [])) || [];
-      if (!cobrancasExistentes.length) {
-        const demoCharges = [
-          {
-            CobrancaID: "cob_demo_01",
-            AsaasPaymentID: "pay_demo_01",
-            ClienteNome: "Padaria e Confeitaria Central Ltda",
-            ClienteEmail: "financeiro@padariacentral.com.br",
-            ClienteCpfCnpj: "12345678000190",
-            ClienteTelefone: "71997069291",
-            Plano: "Start",
-            Valor: 67.0,
-            FormaPagamento: "PIX",
-            Status: "RECEIVED",
-            Vencimento: nowIso().slice(0, 10),
-            InvoiceUrl: "https://sandbox.asaas.com/i/pay_demo_01",
-            CriadoEm: nowIso(),
-          },
-          {
-            CobrancaID: "cob_demo_02",
-            AsaasPaymentID: "pay_demo_02",
-            ClienteNome: "Hamburgueria & Restaurante House",
-            ClienteEmail: "financeiro@house.com.br",
-            ClienteCpfCnpj: "98765432000110",
-            ClienteTelefone: "71997069291",
-            Plano: "Pro",
-            Valor: 127.0,
-            FormaPagamento: "PIX",
-            Status: "RECEIVED",
-            Vencimento: nowIso().slice(0, 10),
-            InvoiceUrl: "https://sandbox.asaas.com/i/pay_demo_02",
-            CriadoEm: nowIso(),
-          },
-          {
-            CobrancaID: "cob_demo_03",
-            AsaasPaymentID: "pay_demo_03",
-            ClienteNome: "Rede Supermercados Bahia Sul",
-            ClienteEmail: "contato@bahiasul.com.br",
-            ClienteCpfCnpj: "45123789000155",
-            ClienteTelefone: "71997069291",
-            Plano: "Enterprise",
-            Valor: 197.0,
-            FormaPagamento: "BOLETO",
-            Status: "PENDING",
-            Vencimento: nowIso().slice(0, 10),
-            InvoiceUrl: "https://sandbox.asaas.com/i/pay_demo_03",
-            CriadoEm: nowIso(),
-          },
-        ];
-
-        for (const c of demoCharges) {
-          await runtime.upsert("AsaasCobrancas", c);
-        }
-      }
-
-      const assinaturasExistentes = (await runtime.list("AsaasAssinaturas").catch(() => [])) || [];
-      if (!assinaturasExistentes.length) {
-        const demoSubs = [
-          {
-            AssinaturaID: "sub_demo_01",
-            AsaasSubscriptionID: "sub_demo_01",
-            ClienteNome: "Padaria e Confeitaria Central Ltda",
-            Plano: "Start",
-            Valor: 67.0,
-            Status: "ACTIVE",
-            FormaPagamento: "PIX",
-            Ciclo: "MENSAL",
-            CriadoEm: nowIso(),
-          },
-          {
-            AssinaturaID: "sub_demo_02",
-            AsaasSubscriptionID: "sub_demo_02",
-            ClienteNome: "Hamburgueria & Restaurante House",
-            Plano: "Pro",
-            Valor: 127.0,
-            Status: "ACTIVE",
-            FormaPagamento: "PIX",
-            Ciclo: "MENSAL",
-            CriadoEm: nowIso(),
-          },
-        ];
-        for (const s of demoSubs) {
-          await runtime.upsert("AsaasAssinaturas", s);
-        }
-      }
-
-      await audit("Configuração Rápida Asaas Concluída", {
-        ambiente: cleanAmbiente,
-        configurado: true,
-      });
-
-      return success({
-        mensagem: "Integração Asaas configurada com sucesso em modo Sandbox com dados demonstrativos.",
         ambiente: cleanAmbiente,
       });
     },
@@ -588,7 +476,12 @@ export function createAsaasHandlers() {
       const profile = await runtime.requireProfile();
       requireAdmin(profile);
       const [filtros = {}] = args;
-      const list = (await runtime.list("AsaasCobrancas").catch(() => [])) || [];
+      const rawList = (await runtime.list("AsaasCobrancas").catch(() => [])) || [];
+      const list = rawList.filter(
+        (c) =>
+          !String(c.CobrancaID || "").startsWith("cob_demo_") &&
+          !String(c.AsaasPaymentID || "").startsWith("pay_demo_"),
+      );
 
       let filtered = [...list];
       if (filtros.status) {
@@ -600,7 +493,13 @@ export function createAsaasHandlers() {
 
       filtered.sort((a, b) => new Date(b.CriadoEm || 0) - new Date(a.CriadoEm || 0));
 
-      const assinaturas = (await runtime.list("AsaasAssinaturas").catch(() => [])) || [];
+      const rawAssinaturas = (await runtime.list("AsaasAssinaturas").catch(() => [])) || [];
+      const assinaturas = rawAssinaturas.filter(
+        (s) =>
+          !String(s.AssinaturaID || "").startsWith("sub_demo_") &&
+          !String(s.AsaasSubscriptionID || "").startsWith("sub_demo_"),
+      );
+
       const totalRecebido = list
         .filter((c) => c.Status === "RECEIVED" || c.Status === "CONFIRMED")
         .reduce((sum, c) => sum + (Number(c.Valor) || 0), 0);

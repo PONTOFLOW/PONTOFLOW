@@ -9,6 +9,8 @@ import {
 } from "../src/core/api-asaas.js";
 import { runtime } from "../src/core/runtime.js";
 
+globalThis.__MOCK_ASAAS__ = true;
+
 test("Asaas Integration: validação e normalização de CPF/CNPJ", () => {
   assert.equal(normalizeCpfCnpj("123.456.789-01"), "12345678901");
   assert.equal(normalizeCpfCnpj("12.345.678/0001-90"), "12345678000190");
@@ -86,7 +88,7 @@ test("Asaas Integration: ciclo completo de clientes, cobrança PIX, assinatura e
     // 1. Configuração do Asaas
     const saveRes = await handlers.asaasConfigSave([
       {
-        apiKey: "simulado_token_asaas_12345",
+        apiKey: "token_autenticacao_asaas_producao_key_67890",
         ambiente: "sandbox",
         emailNotificacao: "financeiro@empresa.com",
       },
@@ -178,7 +180,7 @@ test("Asaas Integration: ciclo completo de clientes, cobrança PIX, assinatura e
   }
 });
 
-test("Asaas Integration: asaasQuickSetup inicializa ambiente Sandbox com dados demonstrativos", async () => {
+test("Asaas Integration: garantia de estado limpo sem dados demonstrativos ou tokens simulados", async () => {
   const tables = new Map();
   const getTable = (name) => {
     if (!tables.has(name)) tables.set(name, new Map());
@@ -215,20 +217,49 @@ test("Asaas Integration: asaasQuickSetup inicializa ambiente Sandbox com dados d
 
   try {
     const handlers = createAsaasHandlers();
-    const quickRes = await handlers.asaasQuickSetup([]);
-    assert.equal(quickRes.success, true);
-    assert.equal(quickRes.data.ambiente, "sandbox");
+    
+    // 1. Estado inicial limpo: não configurado, sem chave mascarada fictícia
+    const initialConfig = await handlers.asaasConfigGet();
+    assert.equal(initialConfig.success, true);
+    assert.equal(initialConfig.data.configurado, false);
+    assert.equal(initialConfig.data.apiKeyMascarada, "");
 
-    const config = await handlers.asaasConfigGet();
-    assert.equal(config.data.configurado, true);
-    assert.equal(config.data.ambiente, "sandbox");
+    // 2. Chave simulada ou mock é tratada estritamente como NÃO configurada
+    await handlers.asaasConfigSave([
+      {
+        apiKey: "simulado_token_asaas_pontoflow",
+        ambiente: "sandbox",
+        emailNotificacao: "glleucekk77@gmail.com",
+      },
+    ]);
+    const mockConfig = await handlers.asaasConfigGet();
+    assert.equal(mockConfig.data.configurado, false);
+    assert.equal(mockConfig.data.apiKeyMascarada, "");
 
+    // 3. Salvando chave real legítima ativa a configuração
+    await handlers.asaasConfigSave([
+      {
+        apiKey: "token_autenticacao_asaas_producao_key_67890",
+        ambiente: "producao",
+        emailNotificacao: "glleucekk77@gmail.com",
+      },
+    ]);
+    const realConfig = await handlers.asaasConfigGet();
+    assert.equal(realConfig.data.configurado, true);
+    assert.equal(realConfig.data.ambiente, "producao");
+    assert.ok(realConfig.data.apiKeyMascarada.includes("****"));
+
+    // 4. Lista de pagamentos não exibe dados fake ou demo
+    getTable("AsaasCobrancas").set("cob_demo_1", {
+      CobrancaID: "cob_demo_1",
+      ClienteNome: "Padaria Central Demo",
+      Valor: 67,
+    });
     const listRes = await handlers.asaasPaymentList([]);
     assert.equal(listRes.success, true);
-    assert.equal(listRes.data.length, 3);
-    assert.equal(listRes.data.estatisticas.totalRecebido, 194);
-    assert.equal(listRes.data.estatisticas.pendentes, 1);
-    assert.equal(listRes.data.estatisticas.totalAssinaturas, 2);
+    assert.equal(listRes.data.length, 0);
+    assert.equal(listRes.data.estatisticas.totalRecebido, 0);
+    assert.equal(listRes.data.estatisticas.pendentes, 0);
   } finally {
     runtime.getById = originalMethods.getById;
     runtime.list = originalMethods.list;
