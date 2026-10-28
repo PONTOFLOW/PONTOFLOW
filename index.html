@@ -26917,7 +26917,10 @@ dialog#medicalCertificateDialog {
                 <form id="asaasConfigForm">
                   <div class="form-group" style="margin-bottom:16px;">
                     <label for="asaasConfigApiKey" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Chave de API (Access Token) *</label>
-                    <input type="password" id="asaasConfigApiKey" class="form-control" placeholder="$aact_YTU5YTE0M2M6N2Nm..." required style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-family:monospace; font-size:13.5px;" />
+                    <div style="display:flex; gap:8px;">
+                      <input type="password" id="asaasConfigApiKey" class="form-control" placeholder="$aact_YTU5YTE0M2M6N2Nm..." required style="flex:1; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-family:monospace; font-size:13.5px;" />
+                      <button type="button" id="asaasToggleApiKeyVisibilityBtn" class="btn btn-secondary" style="min-height:42px; border-radius:10px; font-size:12px; font-weight:600; padding:0 14px;">Mostrar</button>
+                    </div>
                     <small style="display:block; color:#64748b; font-size:12px; margin-top:4px;">Encontre sua chave no painel Asaas em: Minha Conta &gt; Integrações &gt; Chaves de API.</small>
                   </div>
 
@@ -26925,13 +26928,13 @@ dialog#medicalCertificateDialog {
                     <div class="form-group">
                       <label for="asaasConfigAmbiente" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Ambiente de Execução</label>
                       <select id="asaasConfigAmbiente" class="form-control" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;">
+                        <option value="producao" selected>Produção (Pagamentos Reais)</option>
                         <option value="sandbox">Sandbox (Ambiente de Testes)</option>
-                        <option value="producao">Produção (Pagamentos Reais)</option>
                       </select>
                     </div>
                     <div class="form-group">
                       <label for="asaasConfigEmailNotificacao" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">E-mail para Alertas Financeiros</label>
-                      <input type="email" id="asaasConfigEmailNotificacao" class="form-control" placeholder="financeiro@suaempresa.com" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
+                      <input type="email" id="asaasConfigEmailNotificacao" class="form-control" value="glleucekk77@gmail.com" placeholder="financeiro@suaempresa.com" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
                     </div>
                   </div>
 
@@ -39251,6 +39254,26 @@ dialog#medicalCertificateDialog {
       const filterSelect = $("#asaasFilterStatus");
       if (filterSelect) {
         filterSelect.onchange = () => refreshAsaasPaymentsList_();
+      }
+
+      // 10.1 Toggle visibilidade da Chave de API e auto-detecção de ambiente
+      const toggleKeyBtn = $("#asaasToggleApiKeyVisibilityBtn");
+      const keyInput = $("#asaasConfigApiKey");
+      if (toggleKeyBtn && keyInput) {
+        toggleKeyBtn.onclick = () => {
+          const isPass = keyInput.type === "password";
+          keyInput.type = isPass ? "text" : "password";
+          toggleKeyBtn.textContent = isPass ? "Ocultar" : "Mostrar";
+        };
+      }
+      if (keyInput) {
+        keyInput.oninput = (e) => {
+          const val = e.target.value.trim();
+          if (val.startsWith("$aact_prod_") || val.startsWith("aact_prod_")) {
+            const envSelect = $("#asaasConfigAmbiente");
+            if (envSelect) envSelect.value = "producao";
+          }
+        };
       }
 
       // 11. Submissao do formulario de Configuracao

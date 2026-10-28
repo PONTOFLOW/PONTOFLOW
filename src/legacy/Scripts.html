@@ -10113,6 +10113,26 @@
         filterSelect.onchange = () => refreshAsaasPaymentsList_();
       }
 
+      // 10.1 Toggle visibilidade da Chave de API e auto-detecção de ambiente
+      const toggleKeyBtn = $("#asaasToggleApiKeyVisibilityBtn");
+      const keyInput = $("#asaasConfigApiKey");
+      if (toggleKeyBtn && keyInput) {
+        toggleKeyBtn.onclick = () => {
+          const isPass = keyInput.type === "password";
+          keyInput.type = isPass ? "text" : "password";
+          toggleKeyBtn.textContent = isPass ? "Ocultar" : "Mostrar";
+        };
+      }
+      if (keyInput) {
+        keyInput.oninput = (e) => {
+          const val = e.target.value.trim();
+          if (val.startsWith("$aact_prod_") || val.startsWith("aact_prod_")) {
+            const envSelect = $("#asaasConfigAmbiente");
+            if (envSelect) envSelect.value = "producao";
+          }
+        };
+      }
+
       // 11. Submissao do formulario de Configuracao
       const configForm = $("#asaasConfigForm");
       if (configForm) {
