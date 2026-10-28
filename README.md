@@ -15,7 +15,6 @@ O projeto já vem acompanhado do ecossistema completo para você começar a come
 - 🎯 **[PITCH_E_SCRIPTS_DE_VENDAS.md](PITCH_E_SCRIPTS_DE_VENDAS.md)**: Scripts para WhatsApp, Cold Call de 90s, Roteiro de Demonstração ao vivo de 15 minutos e Quebra de Objeções.
 - 📄 **[PROPOSTA_COMERCIAL_MODELO.md](PROPOSTA_COMERCIAL_MODELO.md)**: Modelo pronto de proposta comercial e contrato de prestação de serviços com escopo, prazos e garantia.
 - ⚡ **[CHECKLIST_IMPLANTACAO_CLIENTE.md](CHECKLIST_IMPLANTACAO_CLIENTE.md)**: Passo a passo para configurar e entregar o sistema rodando para um novo cliente em apenas 15 minutos.
-- 🎬 **[public/video-apresentacao.html](public/video-apresentacao.html)**: Vídeo/Player de apresentação oficial com narração por voz e telas 100% reais do sistema em funcionamento, com opção de gravar e baixar em WebM para envio a clientes.
 - 🌐 **[public/vendas.html](public/vendas.html)**: Landing page comercial moderna (Apple iOS Design System) com calculadora interativa de ROI pronta para apresentação ou captação de clientes.
 - 🛠️ **[GUIA_COMERCIAL_E_CONFIGURACAO.md](GUIA_COMERCIAL_E_CONFIGURACAO.md)**: Guia técnico de configuração do Firebase, regras de segurança e white-label.
 
