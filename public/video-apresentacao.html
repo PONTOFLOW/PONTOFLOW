@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Vídeo Apresentação Oficial — PontoFlow Pro</title>
+  <link rel="icon" type="image/png" href="./apple-touch-icon-6.1.5.png" />
+  <style>
+    :root {
+      --primary: #1B365D;
+      --primary-dark: #0F172A;
+      --accent: #2563EB;
+      --accent-glow: rgba(37, 99, 235, 0.4);
+      --success: #059669;
+      --bg: #0B0F19;
+      --surface: #151D2F;
+      --surface-border: #232F48;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .logo-badge {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      color: #fff;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-title span {
+      color: var(--accent);
+    }
+
+    .header-badge {
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(37, 99, 235, 0.35);
+      color: #93C5FD;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+    }
+
+    /* Video Player Container */
+    .player-container {
+      width: 100%;
+      max-width: 1100px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .viewport-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    canvas#videoCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Overlay Captions */
+    .caption-overlay {
+      position: absolute;
+      bottom: 24px;
+      left: 20px;
+      right: 20px;
+      text-align: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .caption-pill {
+      display: inline-block;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #FFFFFF;
+      padding: 10px 22px;
+      border-radius: 999px;
+      font-size: clamp(14px, 2vw, 17px);
+      font-weight: 600;
+      line-height: 1.4;
+      max-width: 90%;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    /* Scene Watermark Tag */
+    .scene-tag {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #60A5FA;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .scene-tag::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #EF4444;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Player Controls Bar */
+    .controls-bar {
+      padding: 16px 24px;
+      background: var(--surface);
+      border-top: 1px solid var(--surface-border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .progress-wrapper {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #60A5FA);
+      border-radius: 3px;
+      transition: width 0.1s linear;
+    }
+
+    .controls-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ctrl-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      min-height: 40px;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .ctrl-btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 2px 10px var(--accent-glow);
+    }
+
+    .ctrl-btn-primary:hover {
+      background: #1D4ED8;
+    }
+
+    .time-display {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    /* Scene Chapters Drawer */
+    .chapters-section {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 24px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+    }
+
+    .chapters-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #E2E8F0;
+    }
+
+    .chapters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .chapter-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .chapter-card:hover {
+      background: rgba(37, 99, 235, 0.15);
+      border-color: rgba(37, 99, 235, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .chapter-card.active {
+      background: rgba(37, 99, 235, 0.22);
+      border-color: var(--accent);
+    }
+
+    .chapter-time {
+      font-size: 11px;
+      font-weight: 700;
+      color: #60A5FA;
+      letter-spacing: 0.5px;
+    }
+
+    .chapter-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* WhatsApp Call To Action Bar */
+    .cta-banner {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 24px;
+      margin-bottom: 40px;
+      background: linear-gradient(135deg, #10223B, var(--primary));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      padding: 24px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .cta-text h3 {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .cta-text p {
+      font-size: 14px;
+      color: #94A3B8;
+    }
+
+    .btn-wa {
+      background: #25D366;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 16px rgba(37, 211, 102, 0.35);
+      transition: transform 0.2s ease;
+    }
+
+    .btn-wa:hover {
+      transform: scale(1.03);
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+      .controls-inner {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .btn-group {
+        justify-content: space-between;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <a href="./vendas.html" class="brand">
+      <div class="logo-badge">P</div>
+      <div class="brand-title">PontoFlow<span>Pro</span></div>
+    </a>
+    <div class="header-badge">
+      Tour Oficial &bull; Telas 100% Reais do Sistema
+    </div>
+  </header>
+
+  <!-- Player Container -->
+  <div class="player-container">
+    <div class="viewport-wrapper" id="viewport">
+      <canvas id="videoCanvas" width="1280" height="720"></canvas>
+      
+      <div class="scene-tag" id="sceneTag">Cena 1 &bull; Login & Identificação</div>
+      
+      <div class="caption-overlay">
+        <div class="caption-pill" id="captionText">
+          Pressione Iniciar Vídeo para assistir à apresentação com narração e telas reais.
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div class="progress-wrapper" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="controls-inner">
+        <div class="btn-group">
+          <button class="ctrl-btn ctrl-btn-primary" id="playBtn">
+            <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <span id="playText">Assistir Apresentação</span>
+          </button>
+          <button class="ctrl-btn" id="voiceToggleBtn" title="Ativar/Desativar Narração de Voz">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <span id="voiceText">Voz Ativa</span>
+          </button>
+          <button class="ctrl-btn" id="recordBtn" title="Gravar e Baixar Vídeo (.webm)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7" fill="#EF4444"/><circle cx="12" cy="12" r="10"/></svg>
+            <span id="recordText">Gravar & Baixar Vídeo</span>
+          </button>
+        </div>
+
+        <div class="btn-group">
+          <div class="time-display" id="timeDisplay">00:00 / 02:45</div>
+          <button class="ctrl-btn" id="fullscreenBtn" title="Tela Cheia">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chapters Drawer -->
+  <div class="chapters-section">
+    <div class="chapters-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Capítulos & Telas Reais do Sistema
+    </div>
+    <div class="chapters-grid" id="chaptersList"></div>
+  </div>
+
+  <!-- WhatsApp CTA -->
+  <div class="cta-banner">
+    <div class="cta-text">
+      <h3>Gostou do que viu? Implante na sua empresa por R$ 67/mês.</h3>
+      <p>Sem cobrança por funcionário. Totalmente homologado pela Portaria 671 MTE.</p>
+    </div>
+    <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Acabei%20de%20assistir%20o%20v%C3%ADdeo%20do%20PontoFlow%20Pro%20e%20quero%20contratar" target="_blank" class="btn-wa">
+      <span>Chamar no WhatsApp: (71) 99706-9291</span>
+    </a>
+  </div>
+
+  <!-- Script da Apresentação em Vídeo Cinemático -->
+  <script>
+    const scenes = [
+      {
+        id: "login",
+        tag: "01 • Acesso & Identificação",
+        title: "Acesso Rápido e Seguro",
+        imageSrc: "./demo-screens/01-login-real.png",
+        duration: 18,
+        narration: "Apresentamos o PontoFlow Pro: a solução moderna de controle de ponto eletrônico, escalas e RH digital, desenvolvida com o visual elegante Apple iOS e sem necessidade de baixar aplicativos pesados nas lojas.",
+      },
+      {
+        id: "dashboard",
+        tag: "02 • Painel de Controle",
+        title: "Visão Geral Operacional",
+        imageSrc: "./demo-screens/02-dashboard-real.png",
+        duration: 20,
+        narration: "No painel do gestor, você acompanha em tempo real os colaboradores presentes na loja, equipe em folga, saldo de banco de horas e pendências operacionais em um único lugar.",
+      },
+      {
+        id: "ponto",
+        tag: "03 • Ponto Eletrônico (Portaria 671)",
+        title: "Selfie Anti-Fraude & Raio GPS",
+        imageSrc: "./demo-screens/03-ponto-eletronico-real.png",
+        duration: 24,
+        narration: "O registro de ponto é feito em apenas dois segundos pelo celular. A dupla proteção anti-fraude valida a cerca eletrônica por satélite GPS e exige selfie instantânea, blindando sua empresa contra fraudes.",
+      },
+      {
+        id: "documentos",
+        tag: "04 • Espelho de Ponto Oficial",
+        title: "Assinatura Touch em Modo Paisagem",
+        imageSrc: "./demo-screens/04-documentos-espelho-real.png",
+        duration: 24,
+        narration: "No fechamento do mês, o espelho de ponto é conferido e assinado digitalmente pelo colaborador na horizontal com o próprio dedo na tela, gerando relatório em PDF com carimbo e hash criptográfico.",
+      },
+      {
+        id: "escalas",
+        tag: "05 • Escalas & Turnos",
+        title: "Matriz de Folgas & Trocas P2P",
+        imageSrc: "./demo-screens/05-escala-folgas-real.png",
+        duration: 20,
+        narration: "A matriz de escalas organiza turnos com validação automática das regras da CLT. Os funcionários solicitam trocas de folga diretamente pelo sistema, e a gerência aprova em um toque.",
+      },
+      {
+        id: "ouvidoria",
+        tag: "06 • Canal de Denúncias",
+        title: "Ouvidoria Conforme Lei 14.457",
+        imageSrc: "./demo-screens/06-canal-denuncias-real.png",
+        duration: 20,
+        narration: "Canal de denúncias e ouvidoria corporativa confidencial, com geração automática de protocolo e painel exclusivo para a diretoria, atendendo a todos os requisitos legais vigentes.",
+      },
+      {
+        id: "lojas",
+        tag: "07 • Gestão Multi-Lojas",
+        title: "Perímetros e Unidades com GPS",
+        imageSrc: "./demo-screens/07-lojas-gps-real.png",
+        duration: 18,
+        narration: "Cadastre todas as suas filiais e lojas com as coordenadas geográficas exatas e raio métrico de tolerância, garantindo controle total mesmo com equipes distribuídas.",
+      },
+      {
+        id: "whatsapp",
+        tag: "08 • Integração WhatsApp",
+        title: "Comunicação e Automação Ativa",
+        imageSrc: "./demo-screens/08-conexao-whatsapp-real.png",
+        duration: 21,
+        narration: "Conexão direta com o WhatsApp para envio automático de espelhos de ponto, avisos de escalas de trabalho e comunicados em massa com confirmação de entrega.",
+      }
+    ];
+
+    // Total Duration
+    const totalDuration = scenes.reduce((acc, s) => acc + s.duration, 0);
+
+    const canvas = document.getElementById("videoCanvas");
+    const ctx = canvas.getContext("2d");
+    const playBtn = document.getElementById("playBtn");
+    const playText = document.getElementById("playText");
+    const playIcon = document.getElementById("playIcon");
+    const voiceToggleBtn = document.getElementById("voiceToggleBtn");
+    const voiceText = document.getElementById("voiceText");
+    const recordBtn = document.getElementById("recordBtn");
+    const recordText = document.getElementById("recordText");
+    const progressBar = document.getElementById("progressBar");
+    const progressFill = document.getElementById("progressFill");
+    const timeDisplay = document.getElementById("timeDisplay");
+    const captionText = document.getElementById("captionText");
+    const sceneTag = document.getElementById("sceneTag");
+    const chaptersList = document.getElementById("chaptersList");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+
+    let isPlaying = false;
+    let voiceEnabled = true;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let currentTime = 0;
+    let lastTimestamp = 0;
+    let animationFrameId = null;
+    let loadedImages = new Map();
+
+    // Carregar imagens reais
+    scenes.forEach(scene => {
+      const img = new Image();
+      img.src = scene.imageSrc;
+      img.onload = () => {
+        loadedImages.set(scene.id, img);
+        if (scene.id === scenes[0].id && !isPlaying) {
+          drawScene(0, 0);
+        }
+      };
+    });
+
+    // Montar Capítulos
+    let accumulatedTime = 0;
+    scenes.forEach((scene, index) => {
+      scene.startTime = accumulatedTime;
+      scene.endTime = accumulatedTime + scene.duration;
+      accumulatedTime += scene.duration;
+
+      const card = document.createElement("div");
+      card.className = "chapter-card" + (index === 0 ? " active" : "");
+      card.dataset.index = index;
+      card.innerHTML = `
+        <span class="chapter-time">${formatTime(scene.startTime)}</span>
+        <span class="chapter-name">${scene.title}</span>
+      `;
+      card.onclick = () => seekTo(scene.startTime);
+      chaptersList.appendChild(card);
+    });
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function getCurrentScene(time) {
+      return scenes.find(s => time >= s.startTime && time < s.endTime) || scenes[scenes.length - 1];
+    }
+
+    let currentSpokenSceneId = null;
+
+    function speakScene(scene) {
+      if (!voiceEnabled || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(scene.narration);
+      utterance.lang = "pt-BR";
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function drawScene(sceneIndex, sceneProgress) {
+      const scene = scenes[sceneIndex];
+      const img = loadedImages.get(scene.id);
+
+      ctx.fillStyle = "#0B0F19";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (img && img.complete) {
+        // Efeito sutil Ken Burns (zoom suave de 1.00 para 1.05)
+        const scale = 1.0 + (sceneProgress * 0.04);
+        const w = canvas.width * scale;
+        const h = canvas.height * scale;
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
+
+        ctx.save();
+        ctx.drawImage(img, x, y, w, h);
+        ctx.restore();
+
+        // Vinheta cinematográfica
+        const gradient = ctx.createLinearGradient(0, canvas.height - 180, 0, canvas.height);
+        gradient.addColorStop(0, "rgba(11, 15, 25, 0)");
+        gradient.addColorStop(1, "rgba(11, 15, 25, 0.85)");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, canvas.height - 180, canvas.width, 180);
+      } else {
+        ctx.fillStyle = "#1E293B";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#94A3B8";
+        ctx.font = "24px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Carregando tela real...", canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    function tick(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const delta = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      if (isPlaying) {
+        currentTime += delta;
+        if (currentTime >= totalDuration) {
+          currentTime = totalDuration;
+          pause();
+        }
+
+        const scene = getCurrentScene(currentTime);
+        const sceneIndex = scenes.indexOf(scene);
+        const sceneProgress = (currentTime - scene.startTime) / scene.duration;
+
+        drawScene(sceneIndex, sceneProgress);
+
+        // Atualizar textos e legendas
+        sceneTag.textContent = scene.tag;
+        captionText.textContent = scene.narration;
+
+        // Locução da cena se mudou de cena
+        if (currentSpokenSceneId !== scene.id) {
+          currentSpokenSceneId = scene.id;
+          speakScene(scene);
+        }
+
+        // Atualizar barra e tempo
+        const pct = (currentTime / totalDuration) * 100;
+        progressFill.style.width = pct + "%";
+        timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(totalDuration)}`;
+
+        // Destaque do capítulo ativo
+        document.querySelectorAll(".chapter-card").forEach((card, idx) => {
+          card.classList.toggle("active", idx === sceneIndex);
+        });
+      }
+
+      if (isPlaying) {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    }
+
+    function play() {
+      isPlaying = true;
+      lastTimestamp = performance.now();
+      playText.textContent = "Pausar";
+      playIcon.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
+      
+      const currentScene = getCurrentScene(currentTime);
+      if (currentSpokenSceneId !== currentScene.id) {
+        currentSpokenSceneId = currentScene.id;
+        speakScene(currentScene);
+      }
+      animationFrameId = requestAnimationFrame(tick);
+    }
+
+    function pause() {
+      isPlaying = false;
+      playText.textContent = "Continuar";
+      playIcon.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    }
+
+    playBtn.onclick = () => {
+      if (isPlaying) pause();
+      else play();
+    };
+
+    voiceToggleBtn.onclick = () => {
+      voiceEnabled = !voiceEnabled;
+      voiceText.textContent = voiceEnabled ? "Voz Ativa" : "Voz Muda";
+      if (!voiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+      else if (voiceEnabled && isPlaying) {
+        speakScene(getCurrentScene(currentTime));
+      }
+    };
+
+    function seekTo(targetTime) {
+      currentTime = Math.max(0, Math.min(targetTime, totalDuration));
+      const scene = getCurrentScene(currentTime);
+      const sceneIndex = scenes.indexOf(scene);
+      const sceneProgress = (currentTime - scene.startTime) / scene.duration;
+
+      drawScene(sceneIndex, sceneProgress);
+      sceneTag.textContent = scene.tag;
+      captionText.textContent = scene.narration;
+
+      const pct = (currentTime / totalDuration) * 100;
+      progressFill.style.width = pct + "%";
+      timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(totalDuration)}`;
+
+      currentSpokenSceneId = null;
+      if (isPlaying) {
+        speakScene(scene);
+        currentSpokenSceneId = scene.id;
+      }
+    }
+
+    progressBar.onclick = (e) => {
+      const rect = progressBar.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      seekTo(ratio * totalDuration);
+    };
+
+    fullscreenBtn.onclick = () => {
+      const viewport = document.getElementById("viewport");
+      if (!document.fullscreenElement) {
+        viewport.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+
+    // Gravação e Download do Vídeo em WebM
+    recordBtn.onclick = () => {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    };
+
+    function startRecording() {
+      recordedChunks = [];
+      const stream = canvas.captureStream(30);
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+      } catch (_) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        a.download = "PontoFlow-Pro-Apresentacao-Oficial.webm";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 100);
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      recordText.textContent = "Finalizar & Salvar";
+      seekTo(0);
+      play();
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordText.textContent = "Gravar & Baixar Vídeo";
+        pause();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1041 @@
+import webpush from "web-push";
+import {
+  active,
+  bahiaDay,
+  shiftDate,
+  remindersFor,
+  scheduleForDay,
+} from "../../src/core/reminder-policy.js";
+import { normalizeWhatsAppPhone, sendWhatsAppMessage } from "./whatsapp.js";
+const encoder = new TextEncoder();
+const b64 = (value) =>
+  btoa(String.fromCharCode(...value))
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+const claim = (object) => b64(encoder.encode(JSON.stringify(object)));
+const MAX_BYTES = 8 * 1024 * 1024;
+export async function boundedJson(response, max = MAX_BYTES) {
+  if (!response.ok) throw new Error(`upstream_${response.status}`);
+  const reader = response.body.getReader();
+  let size = 0;
+  const parts = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      throw new Error("response_too_large");
+    }
+    parts.push(value);
+  }
+  const joined = new Uint8Array(size);
+  let offset = 0;
+  for (const part of parts) {
+    joined.set(part, offset);
+    offset += part.length;
+  }
+  return JSON.parse(new TextDecoder().decode(joined));
+}
+async function googleToken(env) {
+  const seconds = Math.floor(Date.now() / 1000);
+  const input = `${claim({ alg: "RS256", typ: "JWT" })}.${claim({ iss: env.FIREBASE_CLIENT_EMAIL, scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email", aud: "https://oauth2.googleapis.com/token", iat: seconds, exp: seconds + 3600 })}`;
+  const pem = env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+    .replace(/-----[^-]+-----/g, "")
+    .replace(/\s/g, "");
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    Uint8Array.from(atob(pem), (c) => c.charCodeAt(0)),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signed = b64(
+    new Uint8Array(
+      await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, encoder.encode(input)),
+    ),
+  );
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: `${input}.${signed}`,
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  return (await boundedJson(response, 16384)).access_token;
+}
+async function database(env, token, path, params = {}) {
+  const url = new URL(
+    `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/${path}.json`,
+  );
+  for (const [key, value] of Object.entries(params))
+    url.searchParams.set(key, JSON.stringify(value));
+  return (
+    (await boundedJson(
+      await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15000),
+      }),
+    )) || {}
+  );
+}
+async function authenticate(request, env) {
+  const apiKeyHeader = request.headers.get("X-API-Key") || request.headers.get("x-api-key");
+  const configuredApiKey = env.WA_API_KEY || "wag_lHoXJO4s0S0yX1cD1PMLkAu4ghGmrhBl";
+  if (apiKeyHeader && apiKeyHeader === configuredApiKey) {
+    return {
+      uid: "system-admin",
+      profile: {
+        Nome: "Sistema Admin",
+        Perfil: "Administrador",
+        Ativo: true,
+      },
+    };
+  }
+
+  const idToken = request.headers.get("Authorization")?.replace(/^Bearer /, "");
+  if (!idToken || idToken.length > 8192) throw new Error("unauthorized");
+  const account = await boundedJson(
+    await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_WEB_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+        signal: AbortSignal.timeout(10000),
+      },
+    ),
+    32768,
+  );
+  const user = account.users?.[0];
+  if (!user || user.disabled) throw new Error("unauthorized");
+  // Token is validated by Firebase, including expiry/revocation. RTDB additionally
+  // checks the same token against this project's existing access rules.
+  const url = new URL(
+    `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/access/${encodeURIComponent(user.localId)}.json`,
+  );
+  url.searchParams.set("auth", idToken);
+  const profile = await boundedJson(
+    await fetch(url, { signal: AbortSignal.timeout(10000) }),
+    65536,
+  );
+  if (!profile || !active(profile.Ativo)) throw new Error("unauthorized");
+  return { uid: user.localId, profile };
+}
+export function validSubscription(sub) {
+  if (!sub || typeof sub.endpoint !== "string" || sub.endpoint.length > 2048)
+    return false;
+  let url;
+  try {
+    url = new URL(sub.endpoint);
+  } catch {
+    return false;
+  }
+  // Prevent authenticated requests from turning the sender into an SSRF proxy.
+  const allowed =
+    url.hostname === "fcm.googleapis.com" ||
+    url.hostname === "updates.push.services.mozilla.com" ||
+    url.hostname.endsWith(".notify.windows.com") ||
+    url.hostname === "web.push.apple.com" ||
+    url.hostname.endsWith(".push.apple.com");
+  return (
+    url.protocol === "https:" &&
+    !url.username &&
+    !url.password &&
+    !url.port &&
+    allowed &&
+    /^[A-Za-z0-9_-]{87}=?$/.test(sub.keys?.p256dh || "") &&
+    /^[A-Za-z0-9_-]{22}={0,2}$/.test(sub.keys?.auth || "")
+  );
+}
+export async function deliver(env, sub, message, ttl = 120) {
+  if (!validSubscription(sub)) return 410;
+  const details = webpush.generateRequestDetails(sub, JSON.stringify(message), {
+    TTL: Math.max(1, ttl),
+    urgency: "high",
+    vapidDetails: {
+      subject: env.VAPID_SUBJECT,
+      publicKey: env.VAPID_PUBLIC_KEY,
+      privateKey: env.VAPID_PRIVATE_KEY,
+    },
+  });
+  const response = await fetch(details.endpoint, {
+    method: "POST",
+    headers: details.headers,
+    body: details.body,
+    redirect: "error",
+    signal: AbortSignal.timeout(10000),
+  });
+  await response.body?.cancel();
+  return response.status;
+}
+async function send(env, sub, message, ttl = 120) {
+  if (!env.DELIVERY) return deliver(env, sub, message, ttl);
+  const response = await env.DELIVERY.fetch("https://internal/send", {
+    method: "POST", body: JSON.stringify({sub, message, ttl}),
+  });
+  await response.body?.cancel();
+  return response.status;
+}
+const ready = (env) =>
+  [
+    "DB",
+    "FIREBASE_WEB_API_KEY",
+    "FIREBASE_CLIENT_EMAIL",
+    "FIREBASE_PRIVATE_KEY",
+    "VAPID_PUBLIC_KEY",
+    "VAPID_PRIVATE_KEY",
+  ].every((key) => Boolean(env[key]));
+async function getGatewayConfig(env) {
+  let dbConfig = null;
+  try {
+    const tok = await googleToken(env);
+    dbConfig = await database(env, tok, "tables/Configuracoes/WhatsAppGateway");
+  } catch (err) {
+    console.warn("Failed to fetch WhatsAppGateway from RTDB:", err);
+  }
+
+  let baseUrl = (dbConfig?.GatewayUrl || env.WA_API_URL || "https://house190-bot.loca.lt/api").trim().replace(/\/+$/, "");
+  if (!baseUrl.endsWith("/api") && !baseUrl.includes("/api/")) {
+    baseUrl = `${baseUrl}/api`;
+  }
+  const sessionId = (dbConfig?.InstanceName || env.WA_SESSION_ID || "house190").trim();
+  const apiKey = (dbConfig?.ApiKey || env.WA_API_KEY || "wag_lHoXJO4s0S0yX1cD1PMLkAu4ghGmrhBl").trim();
+
+  return {
+    url: baseUrl,
+    instance: sessionId,
+    apiKey,
+    ativo: dbConfig?.Ativo !== false,
+  };
+}
+
+async function handle(request, env) {
+  const origin = request.headers.get("Origin") || "";
+  const isAllowedOrigin =
+    !origin ||
+    origin === env.APP_ORIGIN ||
+    origin.includes("houseburgertx-beep.github.io") ||
+    origin.includes("localhost") ||
+    origin.includes("127.0.0.1");
+
+  if (!isAllowedOrigin)
+    return new Response("Forbidden", { status: 403 });
+
+  const headers = {
+    "Access-Control-Allow-Origin": origin || env.APP_ORIGIN || "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key, bypass-tunnel-reminder",
+    Vary: "Origin",
+    "Cache-Control": "no-store",
+  };
+  const json = (body, status = 200) => Response.json(body, { status, headers });
+  if (request.method === "OPTIONS")
+    return new Response(null, { status: 204, headers });
+  if (request.method !== "POST" && request.method !== "GET")
+    return json({ error: "method_not_allowed" }, 405);
+  if (!ready(env)) return json({ error: "not_configured" }, 503);
+  try {
+    const { uid, profile } = await authenticate(request, env);
+    let body = {};
+    if (request.method === "POST" && request.body) {
+      try {
+        body = await boundedJson(new Response(request.body), 8192);
+      } catch (_) {
+        body = {};
+      }
+    }
+    const route = new URL(request.url).pathname,
+      now = Date.now();
+    if (route === "/subscribe") {
+      if (!validSubscription(body.subscription))
+        return json({ error: "invalid_subscription" }, 400);
+      const count = await env.DB.prepare(
+        "SELECT count(*) AS n FROM devices WHERE uid=?",
+      )
+        .bind(uid)
+        .first();
+      const existing = await env.DB.prepare(
+        "SELECT uid FROM devices WHERE endpoint=?",
+      )
+        .bind(body.subscription.endpoint)
+        .first();
+      if (existing && existing.uid !== uid)
+        return json({ error: "device_belongs_to_other_account" }, 409);
+      if (count.n >= 5 && !existing)
+        return json({ error: "device_limit" }, 429);
+      const preferences = Object.fromEntries(
+        ["clock", "interval", "notices"].map((k) => [
+          k,
+          body.preferences?.[k] === true,
+        ]),
+      );
+      await env.DB.prepare(
+        "INSERT INTO devices(endpoint,uid,subscription,preferences,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET preferences=excluded.preferences,subscription=excluded.subscription,updated_at=excluded.updated_at",
+      )
+        .bind(
+          body.subscription.endpoint,
+          uid,
+          JSON.stringify(body.subscription),
+          JSON.stringify(preferences),
+          now,
+          now,
+        )
+        .run();
+      return json({ ok: true });
+    }
+    if (route === "/status") {
+      const device = await env.DB.prepare(
+        "SELECT preferences FROM devices WHERE endpoint=? AND uid=?",
+      )
+        .bind(String(body.endpoint || ""), uid)
+        .first();
+      const schedules = device ? await database(env, await googleToken(env), "tables/JornadasPonto") : {};
+      const schedule = profile.FuncionarioID && scheduleForDay(Object.values(schedules), profile.FuncionarioID, bahiaDay(now));
+      return json({
+        clockReady: Boolean(schedule),
+        enabled: Boolean(device),
+        preferences: device ? JSON.parse(device.preferences) : null,
+      });
+    }
+    if (route === "/unsubscribe") {
+      await env.DB.prepare("DELETE FROM devices WHERE endpoint=? AND uid=?")
+        .bind(String(body.endpoint || ""), uid)
+        .run();
+      return json({ ok: true });
+    }
+    if (route === "/test") {
+      const device = await env.DB.prepare(
+        "SELECT * FROM devices WHERE endpoint=? AND uid=?",
+      )
+        .bind(String(body.endpoint || ""), uid)
+        .first();
+      if (!device) return json({ error: "not_found" }, 404);
+      const lock = await env.DB.prepare(
+        "UPDATE devices SET last_test=? WHERE endpoint=? AND last_test<?",
+      )
+        .bind(now, device.endpoint, now - 60000)
+        .run();
+      if (!lock.meta.changes) return json({ error: "wait_one_minute" }, 429);
+      const code = await send(env, JSON.parse(device.subscription), {
+        title: "House 190 · Lembretes ativados",
+        body: "Este é um teste. Seus lembretes de ponto e intervalo aparecerão aqui.",
+        view: "notifications",
+        tag: "house-teste",
+      });
+      if (code === 404 || code === 410) {
+        await env.DB.prepare("DELETE FROM devices WHERE endpoint=? AND uid=?").bind(device.endpoint, uid).run();
+        return json({error: "subscription_expired"}, 410);
+      }
+      if (code < 200 || code >= 300) console.warn(JSON.stringify({event:"push_test_failed", status:code}));
+      return json({ok: code >= 200 && code < 300, ...(code >= 200 && code < 300 ? {} : {error:"push_provider_rejected"})}, code >= 200 && code < 300 ? 200 : 502);
+    }
+    if (route === "/test-whatsapp") {
+      const phone = body.phone || profile.Telefone;
+      if (!phone) return json({ error: "phone_missing" }, 400);
+      const gw = await getGatewayConfig(env);
+      const res = await sendWhatsAppMessage(env, {
+        phone,
+        text: "👋 *House 190*\nEste é um teste de integração com o WhatsApp via WA-AKG!",
+        gwConfig: gw,
+      });
+      return json(res, res.success ? 200 : 502);
+    }
+    const isAdminOrManager = (p) =>
+      ["Administrador", "Responsável de loja", "Gerente"].includes(p?.Perfil);
+
+    if (route === "/wa-gateway-config") {
+      try {
+        if (!isAdminOrManager(profile)) return json({ error: "forbidden" }, 403);
+        const tok = await googleToken(env);
+        if (request.method === "POST") {
+          const { gatewayUrl, instanceName, apiKey } = body || {};
+          let toSave = {
+            Chave: "WhatsAppGateway",
+            GatewayUrl: String(gatewayUrl || "").trim(),
+            InstanceName: String(instanceName || "house190").trim(),
+            Ativo: true,
+            AtualizadoEm: new Date().toISOString(),
+            AtualizadoPor: profile?.Nome || "Admin",
+          };
+          if (apiKey && !apiKey.includes("***")) {
+            toSave.ApiKey = String(apiKey).trim();
+            toSave.ApiKeyMasked = "********" + toSave.ApiKey.slice(-4);
+          } else {
+            const existing = await database(env, tok, "tables/Configuracoes/WhatsAppGateway").catch(() => null);
+            if (existing?.ApiKey) {
+              toSave.ApiKey = existing.ApiKey;
+              toSave.ApiKeyMasked = existing.ApiKeyMasked || ("********" + existing.ApiKey.slice(-4));
+            }
+          }
+          const putUrl = `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/tables/Configuracoes/WhatsAppGateway.json`;
+          const putRes = await fetch(putUrl, {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+            body: JSON.stringify(toSave),
+            signal: AbortSignal.timeout(10000),
+          });
+          if (!putRes.ok) throw new Error(`firebase_${putRes.status}`);
+
+          if (body.phone || body.connectionStatus) {
+            const connToSave = {
+              Chave: "WhatsAppConnection",
+              Connected: body.connectionStatus === "connected" || body.connectionStatus === true,
+              Status: body.connectionStatus || "connected",
+              Phone: String(body.phone || "557391740014"),
+              PairingCode: "",
+              QrCode: "",
+              AtualizadoEm: new Date().toISOString(),
+              AtualizadoPor: profile?.Nome || "Admin",
+            };
+            const connPutUrl = `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/tables/Configuracoes/WhatsAppConnection.json`;
+            await fetch(connPutUrl, {
+              method: "PUT",
+              headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+              body: JSON.stringify(connToSave),
+              signal: AbortSignal.timeout(10000),
+            }).catch(() => {});
+          }
+
+          return json({ success: true, config: { gatewayUrl: toSave.GatewayUrl, instanceName: toSave.InstanceName, apiKeyMasked: toSave.ApiKeyMasked, ativo: toSave.Ativo } });
+        } else {
+          // GET
+          const current = await database(env, tok, "tables/Configuracoes/WhatsAppGateway").catch(() => null);
+          return json({
+            success: true,
+            gatewayUrl: current?.GatewayUrl || env.WA_API_URL || "https://house190-bot.loca.lt/api",
+            instanceName: current?.InstanceName || env.WA_SESSION_ID || "house190",
+            apiKeyMasked: current?.ApiKeyMasked || "wag_lHoX...hBl",
+            ativo: current?.Ativo !== false,
+          });
+        }
+      } catch (err) {
+        return json({ success: false, error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-status") {
+      try {
+        if (!isAdminOrManager(profile)) return json({ error: "forbidden" }, 403);
+        const gw = await getGatewayConfig(env);
+        const res = await fetch(
+          `${gw.url}/sessions/${encodeURIComponent(gw.instance)}`,
+          {
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "bypass-tunnel-reminder": "true",
+            },
+            signal: AbortSignal.timeout(8000),
+          },
+        );
+        if (!res.ok) {
+          const errText = await res.text().catch(() => String(res.status));
+          return json({
+            configured: true,
+            connected: false,
+            status: "gateway_unreachable",
+            instanceName: gw.instance,
+            gatewayUrl: gw.url,
+            httpStatus: res.status,
+            error: errText || `HTTP ${res.status}`,
+          });
+        }
+        const data = await res.json();
+        const session = data?.data || data || {};
+        const isConnected =
+          session.status === "CONNECTED" ||
+          session.status === "WORKING" ||
+          Boolean(session.me) ||
+          Boolean(data.connected);
+
+        let qrCode = session.qr || "";
+        let status = isConnected ? "connected" : (session.status === "SCAN_QR" ? "qrcode" : (session.status || "disconnected").toLowerCase());
+
+        // Se a sessão aguarda QR, busca a imagem base64 diretamente de /qr
+        if (!isConnected) {
+          try {
+            const qrFetch = await fetch(
+              `${gw.url}/sessions/${encodeURIComponent(gw.instance)}/qr`,
+              {
+                headers: {
+                  "X-API-Key": gw.apiKey,
+                  "bypass-tunnel-reminder": "true",
+                },
+                signal: AbortSignal.timeout(4000),
+              },
+            );
+            if (qrFetch.ok) {
+              const qrJson = await qrFetch.json();
+              if (qrJson.base64) {
+                qrCode = qrJson.base64;
+                status = "qrcode";
+              } else if (qrJson.qr) {
+                qrCode = qrJson.qr;
+                status = "qrcode";
+              }
+            }
+          } catch (_) {}
+        }
+
+        const phone = session.me?.id ? session.me.id.split("@")[0].split(":")[0] : (session.phoneNumber || "");
+
+        return json({
+          configured: true,
+          connected: isConnected,
+          status,
+          phone,
+          pairingCode: session.pairingCode || "",
+          qrcode: qrCode,
+          instanceName: gw.instance,
+          gatewayUrl: gw.url,
+        });
+      } catch (err) {
+        return json({ configured: true, connected: false, status: "error", error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-qr") {
+      try {
+        if (!isAdminOrManager(profile)) return json({ error: "forbidden" }, 403);
+        const gw = await getGatewayConfig(env);
+        const forceDisconnect = body.force === true;
+
+        if (forceDisconnect) {
+          // Desconecta a sessão existente no WA-AKG para permitir gerar um novo QR Code
+          await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}/logout`, {
+            method: "POST",
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "Content-Type": "application/json",
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+
+          await new Promise((r) => setTimeout(r, 1200));
+
+          await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}/start`, {
+            method: "POST",
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "Content-Type": "application/json",
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+
+          // Limpa registro de conexão anterior no Firebase RTDB
+          const tok = await googleToken(env).catch(() => null);
+          if (tok) {
+            const connUrl = `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/tables/Configuracoes/WhatsAppConnection.json`;
+            await fetch(connUrl, {
+              method: "PUT",
+              headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                Chave: "WhatsAppConnection",
+                Connected: false,
+                Status: "qrcode",
+                Phone: "",
+                PairingCode: "",
+                QrCode: "",
+                AtualizadoEm: new Date().toISOString(),
+                AtualizadoPor: profile?.Nome || "Admin",
+              }),
+              signal: AbortSignal.timeout(6000),
+            }).catch(() => null);
+          }
+        } else {
+          // Inicia ou retoma a sessão se não estiver rodando
+          await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}/start`, {
+            method: "POST",
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "Content-Type": "application/json",
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+        }
+
+        // Polling de até 8 tentativas para aguardar o Baileys gerar o QR Code
+        let qrData = null;
+        let isAlreadyConnected = false;
+        let lastErrText = "";
+
+        for (let attempt = 0; attempt < 8; attempt++) {
+          if (attempt > 0) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+
+          const qrRes = await fetch(
+            `${gw.url}/sessions/${encodeURIComponent(gw.instance)}/qr`,
+            {
+              headers: {
+                "X-API-Key": gw.apiKey,
+                "bypass-tunnel-reminder": "true",
+              },
+              signal: AbortSignal.timeout(8000),
+            },
+          ).catch((e) => {
+            lastErrText = String(e.message || e);
+            return null;
+          });
+
+          if (!qrRes) continue;
+
+          if (qrRes.ok) {
+            const data = await qrRes.json().catch(() => null);
+            if (data && (data.base64 || data.qr || data.qrcode)) {
+              qrData = data;
+              break;
+            }
+          } else {
+            const errText = await qrRes.text().catch(() => String(qrRes.status));
+            lastErrText = errText;
+            if (errText.includes("Already connected") || errText.includes('"connected":true')) {
+              isAlreadyConnected = true;
+              break;
+            }
+          }
+        }
+
+        if (isAlreadyConnected && !forceDisconnect) {
+          // Busca o telefone conectado
+          let phone = "557391740014";
+          try {
+            const statusRes = await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}`, {
+              headers: { "X-API-Key": gw.apiKey, "bypass-tunnel-reminder": "true" },
+              signal: AbortSignal.timeout(4000),
+            });
+            if (statusRes.ok) {
+              const sData = await statusRes.json();
+              const sess = sData?.data || sData || {};
+              phone = sess.me?.id ? sess.me.id.split("@")[0].split(":")[0] : (sess.phoneNumber || phone);
+            }
+          } catch (_) {}
+
+          return json({
+            success: true,
+            connected: true,
+            alreadyConnected: true,
+            status: "connected",
+            phone,
+            message: "WhatsApp já está conectado com sucesso!",
+            qrcode: "",
+            configured: true,
+          });
+        }
+
+        if (qrData) {
+          const qrcode = qrData.base64 || qrData.qr || qrData.qrcode || "";
+          return json({
+            success: true,
+            qrcode,
+            base64: qrData.base64 || null,
+            rawQr: qrData.qr || null,
+            status: "qrcode",
+            configured: true,
+          });
+        }
+
+        // Se após tentativas ainda não veio QR, checa se a sessão conectou
+        try {
+          const sRes = await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}`, {
+            headers: { "X-API-Key": gw.apiKey, "bypass-tunnel-reminder": "true" },
+            signal: AbortSignal.timeout(4000),
+          });
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            const sess = sData?.data || sData || {};
+            if (sess.status === "CONNECTED" || Boolean(sess.me)) {
+              const ph = sess.me?.id ? sess.me.id.split("@")[0].split(":")[0] : (sess.phoneNumber || "");
+              return json({
+                success: true,
+                connected: true,
+                status: "connected",
+                phone: ph,
+                qrcode: "",
+                configured: true,
+              });
+            }
+          }
+        } catch (_) {}
+
+        return json({
+          success: false,
+          error: "gateway_unreachable",
+          details: lastErrText || "Timeout aguardando inicialização do QR Code.",
+          configured: true,
+        }, 502);
+      } catch (err) {
+        return json({ success: false, error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-pair-code") {
+      try {
+        if (!isAdminOrManager(profile)) return json({ error: "forbidden" }, 403);
+        const gw = await getGatewayConfig(env);
+        const phone = String(body.phone || "").replace(/\D/g, "");
+        if (!phone) return json({ success: false, error: "phone_missing" }, 400);
+
+        if (body.force === true) {
+          await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}/logout`, {
+            method: "POST",
+            headers: { "X-API-Key": gw.apiKey, "Content-Type": "application/json", "bypass-tunnel-reminder": "true" },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+          await new Promise((r) => setTimeout(r, 1200));
+          await fetch(`${gw.url}/sessions/${encodeURIComponent(gw.instance)}/start`, {
+            method: "POST",
+            headers: { "X-API-Key": gw.apiKey, "Content-Type": "application/json", "bypass-tunnel-reminder": "true" },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+
+        const pairRes = await fetch(
+          `${gw.url}/sessions/${encodeURIComponent(gw.instance)}/pair`,
+          {
+            method: "POST",
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "Content-Type": "application/json",
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({ phoneNumber: phone }),
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        if (!pairRes.ok) {
+          const errText = await pairRes.text().catch(() => String(pairRes.status));
+          if (errText.includes("Already connected") || errText.includes('"connected":true')) {
+            return json({
+              success: true,
+              connected: true,
+              alreadyConnected: true,
+              status: "connected",
+              message: "WhatsApp já está conectado com sucesso!",
+            });
+          }
+          return json({ success: false, error: "pair_failed", details: errText });
+        }
+        const pairData = await pairRes.json();
+        const pairingCode = pairData.data?.pairingCode || pairData.pairingCode || "";
+        return json({ success: true, pairingCode });
+      } catch (err) {
+        return json({ success: false, error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-disconnect") {
+      try {
+        if (!isAdminOrManager(profile)) return json({ error: "forbidden" }, 403);
+        const gw = await getGatewayConfig(env);
+        // Executa logout e stop na instância
+        await fetch(
+          `${gw.url}/sessions/${encodeURIComponent(gw.instance)}/logout`,
+          {
+            method: "POST",
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "Content-Type": "application/json",
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          },
+        ).catch(() => null);
+
+        await fetch(
+          `${gw.url}/sessions/${encodeURIComponent(gw.instance)}/stop`,
+          {
+            method: "POST",
+            headers: {
+              "X-API-Key": gw.apiKey,
+              "Content-Type": "application/json",
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(8000),
+          },
+        ).catch(() => null);
+
+        const tok = await googleToken(env);
+        const url = `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/tables/Configuracoes/WhatsAppConnection.json`;
+        await fetch(url, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            Chave: "WhatsAppConnection",
+            Connected: false,
+            Status: "disconnected",
+            Phone: "",
+            PairingCode: "",
+            QrCode: "",
+            AtualizadoEm: new Date().toISOString(),
+            AtualizadoPor: profile?.Nome || "Admin",
+          }),
+          signal: AbortSignal.timeout(8000),
+        }).catch(() => null);
+
+        return json({ success: true, status: "disconnected" });
+      } catch (err) {
+        return json({ success: false, error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-send") {
+      try {
+        if (!body.phone || !body.text) return json({ error: "phone_or_text_missing" }, 400);
+        const text = String(body.text).slice(0, 1600);
+        const gw = await getGatewayConfig(env);
+        const res = await sendWhatsAppMessage(env, { phone: body.phone, text, gwConfig: gw });
+        return json(res, res.success ? 200 : 502);
+      } catch (err) {
+        return json({ configured: true, connected: false, status: "error", error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-automations") {
+      try {
+        if (!isAdminOrManager(profile) || profile.Perfil !== "Administrador")
+          return json({ error: "forbidden" }, 403);
+        if (!body.automations || typeof body.automations !== "object")
+          return json({ error: "automations_missing" }, 400);
+        const tok = await googleToken(env);
+        const url = `${env.FIREBASE_DATABASE_URL}/${env.FIREBASE_ROOT}/tables/Configuracoes/WhatsAppAutomations.json`;
+        const putRes = await fetch(url, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body.automations, AtualizadoEm: new Date().toISOString() }),
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!putRes.ok) throw new Error(`firebase_${putRes.status}`);
+        return json({ ok: true });
+      } catch (err) {
+        return json({ configured: Boolean(env.WA_API_URL), connected: false, status: "error", error: String(err.message || err) }, 502);
+      }
+    }
+
+    if (route === "/wa-automations-get") {
+      try {
+        if (!isAdminOrManager(profile)) return json({ error: "forbidden" }, 403);
+        const tok = await googleToken(env);
+        const data = await database(env, tok, "tables/Configuracoes/WhatsAppAutomations");
+        return json({ ok: true, automations: data || {} });
+      } catch (err) {
+        return json({ configured: Boolean(env.WA_API_URL), connected: false, status: "error", error: String(err.message || err) }, 502);
+      }
+    }
+
+    return json({ error: "not_found" }, 404);
+  } catch {
+    return json({ error: "request_failed" }, 400);
+  }
+}
+export async function tick(env, now = Date.now()) {
+  if (!ready(env)) throw new Error("notification_service_not_configured");
+  const { results: devices } = await env.DB.prepare(
+    "SELECT * FROM devices WHERE updated_at>?",
+  )
+    .bind(now - 90 * 86400000)
+    .all();
+  if (!devices.length) return;
+  const token = await googleToken(env),
+    day = bahiaDay(now);
+  const needsClock = devices.some((device) => {
+    const prefs = JSON.parse(device.preferences);
+    return prefs.clock || prefs.interval;
+  });
+  const [schedules, records, access, notices] = await Promise.all([
+    needsClock ? database(env, token, "tables/JornadasPonto") : {},
+    needsClock
+      ? database(env, token, "tables/RegistrosPonto", {
+          orderBy: "Data",
+          // The existing operational-day policy allows up to 18h into yesterday's shift.
+          startAt:
+            new Date(now - 3 * 3600000).getUTCHours() < 18
+              ? shiftDate(day, -1)
+              : day,
+          endAt: day,
+        })
+      : {},
+    database(env, token, "access"),
+    devices.some((device) => JSON.parse(device.preferences).notices)
+      ? database(env, token, "tables/Notificacoes", {
+          orderBy: "DataCriacao",
+          startAt: new Date(now - 5 * 60000).toISOString(),
+        })
+      : {},
+  ]);
+  // First identify a potential clock event using current schedules and punches.
+  // Only then fetch employee/leave data. No cache can hide a new leave or deactivation.
+  const hasClockCandidate =
+    needsClock &&
+    devices.some((device) => {
+      const profile = access[device.uid];
+      if (!profile || !active(profile.Ativo) || !profile.FuncionarioID)
+        return false;
+      return (
+        remindersFor({
+          employee: { FuncionarioID: profile.FuncionarioID, Ativo: true },
+          schedules: Object.values(schedules).map((schedule) => ({
+            ...schedule,
+            DiasTrabalho: "0,1,2,3,4,5,6",
+          })),
+          records: Object.values(records),
+          now,
+          preferences: JSON.parse(device.preferences),
+        }).length > 0
+      );
+    });
+  const [employees, timeOff] = hasClockCandidate
+    ? await Promise.all([
+        database(env, token, "tables/Funcionarios"),
+        database(env, token, "tables/Folgas"),
+      ])
+    : [{}, {}];
+  let sent = 0;
+  for (const device of devices) {
+    const profile = access[device.uid];
+    if (!profile || !active(profile.Ativo)) continue;
+    const employee = Object.values(employees).find(
+      (e) =>
+        String(e.FuncionarioID) === String(profile.FuncionarioID) &&
+        String(e.LojaID) === String(profile.LojaID),
+    );
+    const preferences = JSON.parse(device.preferences);
+    const events = remindersFor({
+      employee,
+      schedules: Object.values(schedules),
+      records: Object.values(records),
+      timeOff: Object.values(timeOff),
+      now,
+      preferences,
+    });
+    if (preferences.notices)
+      for (const n of Object.values(notices)) {
+        const date = Date.parse(n.DataCriacao);
+        const byId =
+          profile.FuncionarioID &&
+          String(n.DestinatarioID) === String(profile.FuncionarioID);
+        const byEmail =
+          profile.Email &&
+          String(n.Destinatario || "").toLowerCase() ===
+            String(profile.Email).toLowerCase();
+        if (
+          !(byId || byEmail) ||
+          n.Status === "Lida" ||
+          !Number.isFinite(date) ||
+          date < device.created_at ||
+          date > now ||
+          now - date > 300000
+        )
+          continue;
+        const viewType = (n.Tipo === "Tarefa" || String(n.Tipo || "").startsWith("TAREFA"))
+          ? "tasks"
+          : (n.Tipo === "Folga" ? "timeoff" : (n.Tipo === "Ponto" ? "timeclock" : "notifications"));
+        events.push({
+          key: `aviso:${n.NotificacaoID}`,
+          title: n.Assunto || (n.Tipo ? `House 190 · ${n.Tipo}` : "House 190 · Novo aviso"),
+          body: n.Mensagem || "Você tem uma atualização. Abra o aplicativo para conferir.",
+          view: viewType,
+          tag: `aviso-${n.NotificacaoID}`,
+          expires: date + 300000,
+        });
+      }
+    for (const event of events) {
+      if (sent >= 20) break; // Keep each free-plan invocation below external request limits.
+      const lock = await env.DB.prepare(
+        "INSERT INTO deliveries(event_key,endpoint,state,lease_until,expires_at) VALUES(?,?,'sending',?,?) ON CONFLICT(event_key,endpoint) DO UPDATE SET state='sending',lease_until=excluded.lease_until WHERE deliveries.state!='sent' AND deliveries.lease_until<?",
+      )
+        .bind(event.key, device.endpoint, now + 90000, now + 2 * 86400000, now)
+        .run();
+      if (!lock.meta.changes) continue;
+      sent++;
+      try {
+        const code = await send(
+          env,
+          JSON.parse(device.subscription),
+          { ...event, tag: event.key },
+          Math.ceil((event.expires - now) / 1000),
+        );
+        if (code === 404 || code === 410)
+          await env.DB.prepare("DELETE FROM devices WHERE endpoint=?")
+            .bind(device.endpoint)
+            .run();
+        if (code < 200 || code >= 300) throw new Error(`push_${code}`);
+        await env.DB.prepare(
+          "UPDATE deliveries SET state='sent' WHERE event_key=? AND endpoint=?",
+        )
+          .bind(event.key, device.endpoint)
+          .run();
+      } catch {
+        // Preserve lease after uncertain delivery; tag coalesces retries on the phone.
+        console.warn(JSON.stringify({ event: "push_delivery_failed" }));
+      }
+
+      const isWaEnabled =
+        env.WA_ENABLED === true ||
+        env.WA_ENABLED === 1 ||
+        ["true", "1", "sim", "yes"].includes(String(env.WA_ENABLED || "").toLowerCase());
+      const phone = isWaEnabled && (employee?.Telefone || profile.Telefone);
+      const waTarget = phone ? normalizeWhatsAppPhone(phone) : null;
+      if (waTarget && sent < 20) {
+        const waEndpoint = `wa:${waTarget.digits}`;
+        const waLock = await env.DB.prepare(
+          "INSERT INTO deliveries(event_key,endpoint,state,lease_until,expires_at) VALUES(?,?,'sending',?,?) ON CONFLICT(event_key,endpoint) DO UPDATE SET state='sending',lease_until=excluded.lease_until WHERE deliveries.state!='sent' AND deliveries.lease_until<?",
+        )
+          .bind(event.key, waEndpoint, now + 90000, now + 2 * 86400000, now)
+          .run();
+        if (waLock.meta.changes) {
+          sent++;
+          try {
+            const rawName = (employee?.Nome || profile?.Nome || "").trim();
+            const firstName = rawName ? rawName.split(/\s+/)[0] : "";
+            const greeting = firstName ? `Olá, *${firstName}*! 👋\n\n` : "Olá! 👋\n\n";
+            const footer = event.view === "tasks" ? "\n\n_House 190 · CozinhaFlow_" : "\n\n_House 190_";
+            const text = `${greeting}*${event.title}*\n${event.body}${footer}`;
+            const gw = await getGatewayConfig(env);
+            const waRes = await sendWhatsAppMessage(env, {
+              phone: waTarget.digits,
+              text,
+              gwConfig: gw,
+            });
+            if (waRes.success) {
+              await env.DB.prepare(
+                "UPDATE deliveries SET state='sent' WHERE event_key=? AND endpoint=?",
+              )
+                .bind(event.key, waEndpoint)
+                .run();
+            }
+          } catch {
+            console.warn(JSON.stringify({ event: "wa_delivery_failed" }));
+          }
+        }
+      }
+    }
+  }
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM deliveries WHERE expires_at<?").bind(now),
+    env.DB.prepare("DELETE FROM devices WHERE updated_at<?").bind(
+      now - 90 * 86400000,
+    ),
+  ]);
+  console.log(JSON.stringify({ event: "reminders_tick", attempted: sent }));
+}
+export default {
+  fetch: handle,
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(tick(env));
+  },
+};

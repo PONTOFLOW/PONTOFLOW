@@ -1,0 +1,2749 @@
+import { APP, PERMISSIONS } from "./constants.js";
+import { isPermissionDenied, runtime } from "./runtime.js";
+import {
+  asBoolean,
+  assert,
+  csvDataUrl,
+  dateRange,
+  normalizeEmail,
+  nowIso,
+  todayIso,
+  uuid,
+} from "./utils.js";
+
+export const success = (data, message = "") => ({
+  success: true,
+  message,
+  data,
+});
+
+export const sessionUser = (profile) => ({
+  id: profile.FuncionarioID || profile.UsuarioID,
+  usuarioId: profile.UsuarioID,
+  funcionarioId: profile.FuncionarioID || "",
+  nome: profile.Nome || "",
+  email: profile.Email || "",
+  perfil: profile.Perfil || "",
+  lojaId: profile.LojaID || "",
+  nomeLoja: profile.NomeLoja || "",
+  cargo: profile.Cargo || "",
+  fotoPerfil: "",
+  ativo: asBoolean(profile.Ativo),
+  UsuarioID: profile.UsuarioID,
+  FuncionarioID: profile.FuncionarioID || "",
+  Nome: profile.Nome || "",
+  Email: profile.Email || "",
+  Perfil: profile.Perfil || "",
+  LojaID: profile.LojaID || "",
+  NomeLoja: profile.NomeLoja || "",
+  Cargo: profile.Cargo || "",
+  Ativo: asBoolean(profile.Ativo),
+  GoogleLinked: asBoolean(profile.GoogleLinked),
+  googleLinked: asBoolean(profile.GoogleLinked),
+});
+
+const dropClientToken = (args) => {
+  const values = Array.isArray(args) ? [...args] : [];
+  if (
+    typeof values[0] === "string" &&
+    (values[0].split(".").length === 3 || values[0].length > 80)
+  ) {
+    values.shift();
+  }
+  return values;
+};
+
+const role = (profile) => String(profile?.Perfil || "").toLowerCase();
+const isAdmin = (profile) => role(profile).includes("admin");
+const isManager = (profile) =>
+  isAdmin(profile) ||
+  role(profile).includes("respons") ||
+  role(profile).includes("gerente");
+
+export const isMonthlyLeaveEmployeeEligible = (employee) => {
+  const activeValue = employee?.Ativo ?? employee?.ativo;
+  const status = String(
+    activeValue ?? employee?.Status ?? employee?.status ?? "",
+  )
+    .trim()
+    .toLowerCase();
+  const explicitlyInactive =
+    activeValue === false ||
+    activeValue === 0 ||
+    ["false", "0", "não", "nao", "inativo", "inactive", "desligado"].includes(
+      status,
+    );
+  return (
+    Boolean(employee?.FuncionarioID) &&
+    !explicitlyInactive
+  );
+};
+
+const isActiveEmployee = (employee) =>
+  isMonthlyLeaveEmployeeEligible(employee);
+
+const requireAdmin = (profile) =>
+  assert(isAdmin(profile), "Somente o Administrador pode executar esta ação.");
+
+const requireManager = (profile) =>
+  assert(
+    isManager(profile),
+    "Esta ação exige perfil de responsável ou administrador.",
+  );
+
+const scopeRecord = (profile, record) => {
+  if (isAdmin(profile)) return true;
+  if (isManager(profile)) {
+    assert(
+      !record?.LojaID ||
+        String(record.LojaID) === String(profile.LojaID || ""),
+      "Este perfil só pode operar dados da própria loja.",
+    );
+    return true;
+  }
+  assert(
+    !record?.FuncionarioID ||
+      String(record.FuncionarioID) === String(profile.FuncionarioID || ""),
+    "O funcionário só pode operar os próprios registros.",
+  );
+  return true;
+};
+
+export const timeOffBalanceUnits = (record = {}) => {
+  const type = String(record.TipoFolga || "Folga").toLowerCase();
+  const debitTypes = [
+    "férias",
+    "ferias",
+    "licença",
+    "licenca",
+    "banco de horas",
+    "outro",
+  ];
+  if (!type.includes("folga") && !debitTypes.includes(type.trim())) return 0;
+  const start = String(record.DataInicio || "");
+  const end = String(record.DataFim || start);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(start) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(end) ||
+    end < start
+  ) {
+    return 0;
+  }
+  const period = String(record.Periodo || "Dia inteiro").toLowerCase();
+  const fraction =
+    type.includes("meia") ||
+    period.includes("manhã") ||
+    period.includes("manha") ||
+    period.includes("tarde") ||
+    period.includes("personalizado")
+      ? 0.5
+      : 1;
+  return Math.round(dateRange(start, end).length * fraction * 100) / 100;
+};
+
+const saveLeaveBalanceMovement = async ({
+  movementId,
+  employee,
+  type,
+  competence,
+  referenceId,
+  result,
+  actor,
+}) => {
+  if (!result?.applied) return;
+  await runtime
+    .upsert("MovimentosSaldoFolgas", {
+      MovimentoID: movementId,
+      FuncionarioID: employee.FuncionarioID,
+      NomeFuncionario: employee.Nome || "",
+      LojaID: employee.LojaID || "",
+      Tipo: type,
+      Competencia: competence || "",
+      ReferenciaID: referenceId || "",
+      Delta: result.desiredDelta,
+      AjusteAplicado: result.adjustment,
+      SaldoAntes: result.balanceBefore,
+      SaldoDepois: result.balanceAfter,
+      DataMovimento: result.appliedAt || nowIso(),
+      CriadoPor: actor?.Email || "",
+      Status: "Aplicado",
+    })
+    .catch((error) =>
+      console.warn("Histórico do saldo de folgas não gravado:", error.message),
+    );
+};
+
+const applyMonthlyLeaveCredit = async (
+  employee,
+  profile,
+  month,
+  storageKey = "",
+) => {
+  const movementId = `credito-mensal-${employee.FuncionarioID}-${month}`;
+  if (
+    Number(employee.SaldoFolgasLancamentos?.[movementId]?.Delta || 0) === 1
+  ) {
+    return {
+      applied: false,
+      adjustment: 0,
+      balanceBefore: Number(employee.SaldoFolgas || 0),
+      balanceAfter: Number(employee.SaldoFolgas || 0),
+      desiredDelta: 1,
+    };
+  }
+  const result = await runtime.applyEmployeeLeaveBalance({
+    employeeId: employee.FuncionarioID,
+    storageKey,
+    movementKey: movementId,
+    desiredDelta: 1,
+    metadata: {
+      Tipo: "Crédito mensal da quinta folga",
+      Competencia: month,
+    },
+  });
+  await saveLeaveBalanceMovement({
+    movementId,
+    employee,
+    type: "Crédito mensal da quinta folga",
+    competence: month,
+    result,
+    actor: profile,
+  });
+  return result;
+};
+
+const monthlyLeaveRewardReceiptId = (employeeId, month) =>
+  `folga-extra-aviso-v3-${month}__${employeeId}`;
+
+const monthlyLeaveRewardNoticeId = (employeeId, month) =>
+  `notificacao-folga-extra-v3-${month}__${employeeId}`;
+
+const holidayLeaveCreditMovementId = (employeeId, holidayId) =>
+  `credito-feriado-${holidayId}-${employeeId}`;
+
+const holidayLeaveRewardReceiptBaseId = (holidayId) =>
+  `feriado-aviso-v1-${holidayId}`;
+
+const holidayLeaveRewardReceiptId = (employeeId, holidayId) =>
+  `${holidayLeaveRewardReceiptBaseId(holidayId)}__${employeeId}`;
+
+const holidayLeaveRewardNoticeId = (employeeId, holidayId) =>
+  `notificacao-feriado-v1-${holidayId}__${employeeId}`;
+
+const holidayDateText = (value) => {
+  const date = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date.split("-").reverse().join("/")
+    : date;
+};
+
+const createMonthlyLeaveRewardNotice = async (employee, profile, month) =>
+  runtime.create("Notificacoes", {
+    NotificacaoID: monthlyLeaveRewardNoticeId(employee.FuncionarioID, month),
+    Destinatario: normalizeEmail(employee.Email),
+    DestinatarioID: employee.FuncionarioID,
+    LojaID: employee.LojaID || profile.LojaID || "",
+    Assunto: "Folga extra na área! 🎉",
+    Mensagem:
+      "Você recebeu +1 folga neste mês. Ela já está disponível no seu saldo.",
+    Tipo: "Folga extra mensal",
+    Status: "Pendente",
+    DataCriacao: nowIso(),
+    DataEnvio: nowIso(),
+    DataLeitura: "",
+    LidoPor: "",
+    Canal: "Aplicação",
+    TentativasEnvio: 0,
+    LinkAcao: "dashboard",
+    Erro: "",
+    RegistoRelacionadoID: `credito-mensal-${employee.FuncionarioID}-${month}`,
+    Competencia: month,
+  });
+
+const applyHolidayLeaveCredit = async (employee, holiday, profile) => {
+  const movementId = holidayLeaveCreditMovementId(
+    employee.FuncionarioID,
+    holiday.FeriadoID,
+  );
+  if (
+    Number(employee.SaldoFolgasLancamentos?.[movementId]?.Delta || 0) === 1
+  ) {
+    return {
+      applied: false,
+      adjustment: 0,
+      balanceBefore: Number(employee.SaldoFolgas || 0),
+      balanceAfter: Number(employee.SaldoFolgas || 0),
+      desiredDelta: 1,
+    };
+  }
+  const result = await runtime.applyEmployeeLeaveBalance({
+    employeeId: employee.FuncionarioID,
+    movementKey: movementId,
+    desiredDelta: 1,
+    metadata: {
+      Tipo: "Crédito por feriado",
+      FeriadoID: holiday.FeriadoID,
+      NomeFeriado: holiday.NomeFeriado || "Feriado",
+      DataFeriado: holiday.Data || "",
+    },
+  });
+  await saveLeaveBalanceMovement({
+    movementId,
+    employee,
+    type: `Crédito por feriado: ${holiday.NomeFeriado || "Feriado"}`,
+    competence: String(holiday.Data || "").slice(0, 7),
+    referenceId: holiday.FeriadoID,
+    result,
+    actor: profile,
+  });
+  return result;
+};
+
+const createHolidayLeaveRewardNotice = async (employee, holiday) => {
+  const name = String(holiday.NomeFeriado || "Novo feriado").trim();
+  const date = holidayDateText(holiday.Data);
+  return runtime.create("Notificacoes", {
+    NotificacaoID: holidayLeaveRewardNoticeId(
+      employee.FuncionarioID,
+      holiday.FeriadoID,
+    ),
+    Destinatario: normalizeEmail(employee.Email),
+    DestinatarioID: employee.FuncionarioID,
+    LojaID: employee.LojaID || "",
+    Assunto: `Feriado cadastrado: ${name} 🎉`,
+    Mensagem: `${name}, em ${date}, gerou +1 folga. Ela já está disponível no seu saldo.`,
+    Tipo: "Folga extra de feriado",
+    Status: "Pendente",
+    DataCriacao: nowIso(),
+    DataEnvio: nowIso(),
+    DataLeitura: "",
+    LidoPor: "",
+    Canal: "Aplicação",
+    TentativasEnvio: 0,
+    LinkAcao: "dashboard",
+    Erro: "",
+    RegistoRelacionadoID: holiday.FeriadoID,
+    FeriadoID: holiday.FeriadoID,
+    NomeFeriado: name,
+    DataFeriado: holiday.Data || "",
+  });
+};
+
+const ensureHolidayLeaveCredits = async (profile, holiday, employees) => {
+  const eligible = holiday.Ativo === false
+    ? []
+    : employees.filter(isActiveEmployee);
+  const existingNoticeIds = new Set(
+    (await runtime.list("Notificacoes", { profile }).catch(() => []))
+      .map((notice) => String(notice.NotificacaoID || "")),
+  );
+  const results = await Promise.all(
+    eligible.map(async (employee) => {
+      let creditResult;
+      try {
+        creditResult = await applyHolidayLeaveCredit(employee, holiday, profile);
+      } catch (error) {
+        console.warn(
+          `Crédito do feriado não aplicado para ${employee.FuncionarioID}:`,
+          error.message,
+        );
+        return {
+          applied: false,
+          confirmed: false,
+          failed: true,
+          noticeCreated: false,
+          noticeFailed: false,
+        };
+      }
+
+      let noticeCreated = false;
+      let noticeFailed = false;
+      try {
+        const noticeId = holidayLeaveRewardNoticeId(
+          employee.FuncionarioID,
+          holiday.FeriadoID,
+        );
+        if (!existingNoticeIds.has(noticeId)) {
+          await createHolidayLeaveRewardNotice(employee, holiday);
+          existingNoticeIds.add(noticeId);
+          noticeCreated = true;
+        }
+      } catch (error) {
+        console.warn(
+          `Aviso do feriado não criado para ${employee.FuncionarioID}:`,
+          error.message,
+        );
+        noticeFailed = true;
+      }
+
+      return {
+        ...creditResult,
+        confirmed: true,
+        failed: false,
+        noticeCreated,
+        noticeFailed,
+      };
+    }),
+  );
+  return {
+    eligible: eligible.length,
+    applied: results.filter((result) => result.applied).length,
+    confirmed: results.filter((result) => result.confirmed).length,
+    failed: results.filter((result) => result.failed).length,
+    noticesCreated: results.filter((result) => result.noticeCreated).length,
+    noticesFailed: results.filter((result) => result.noticeFailed).length,
+  };
+};
+
+const ensureMonthlyLeaveCredits = async (profile, employees) => {
+  if (!isManager(profile)) {
+    return {
+      eligible: 0,
+      applied: 0,
+      confirmed: 0,
+      failed: 0,
+      noticesCreated: 0,
+      noticesFailed: 0,
+    };
+  }
+  const month = todayIso().slice(0, 7);
+  const eligible = employees.filter(isMonthlyLeaveEmployeeEligible);
+  const existingNoticeIds = new Set(
+    (await runtime.list("Notificacoes", { profile }).catch(() => []))
+      .filter((notice) => String(notice.Competencia || "") === month)
+      .map((notice) => String(notice.NotificacaoID || "")),
+  );
+  const results = await Promise.all(
+    eligible.map(async (employee) => {
+      let creditResult;
+      try {
+        // A listagem inicial já guardou no runtime a chave física de cada
+        // cadastro. Reutilizá-la evita baixar toda a tabela novamente para
+        // cada funcionário e mantém compatibilidade com chaves antigas.
+        creditResult = await applyMonthlyLeaveCredit(employee, profile, month);
+      } catch (error) {
+        console.warn(
+          `Crédito mensal não aplicado para ${employee.FuncionarioID}:`,
+          error.message,
+        );
+        return {
+          applied: false,
+          confirmed: false,
+          failed: true,
+          noticeCreated: false,
+          noticeFailed: false,
+        };
+      }
+
+      let noticeCreated = false;
+      let noticeFailed = false;
+      try {
+        const noticeId = monthlyLeaveRewardNoticeId(
+          employee.FuncionarioID,
+          month,
+        );
+        if (!existingNoticeIds.has(noticeId)) {
+          await createMonthlyLeaveRewardNotice(employee, profile, month);
+          existingNoticeIds.add(noticeId);
+          noticeCreated = true;
+        }
+      } catch (error) {
+        console.warn(
+          `Aviso mensal não criado para ${employee.FuncionarioID}:`,
+          error.message,
+        );
+        noticeFailed = true;
+      }
+
+      return {
+        ...creditResult,
+        confirmed: true,
+        failed: false,
+        noticeCreated,
+        noticeFailed,
+      };
+    }),
+  );
+  return {
+    eligible: eligible.length,
+    applied: results.filter((result) => result.applied).length,
+    confirmed: results.filter((result) => result.confirmed).length,
+    failed: results.filter((result) => result.failed).length,
+    noticesCreated: results.filter((result) => result.noticeCreated).length,
+    noticesFailed: results.filter((result) => result.noticeFailed).length,
+  };
+};
+
+const currentEmployeeFrom = (employees, profile) =>
+  employees.find(
+    (employee) =>
+      (profile.FuncionarioID &&
+        String(employee.FuncionarioID || "") ===
+          String(profile.FuncionarioID)) ||
+      (profile.Email &&
+        normalizeEmail(employee.Email) === normalizeEmail(profile.Email)),
+  ) || null;
+
+const holidayLeaveRewardsFor = async (profile, employee, holidays) => {
+  if (!employee?.FuncionarioID || !isActiveEmployee(employee)) return [];
+  const [notices, receipts] = await Promise.all([
+    runtime.list("Notificacoes", { profile }).catch(() => []),
+    runtime.list("ComunicadosLeituras", { profile }).catch(() => []),
+  ]);
+  const holidayById = new Map(
+    holidays.map((holiday) => [String(holiday.FeriadoID || ""), holiday]),
+  );
+  const receiptIds = new Set(
+    receipts.map((receipt) => String(receipt.LeituraID || "")),
+  );
+  return notices
+    .filter(
+      (notice) =>
+        String(notice.Tipo || "") === "Folga extra de feriado" &&
+        String(notice.DestinatarioID || "") ===
+          String(employee.FuncionarioID),
+    )
+    .map((notice) => {
+      const holidayId = String(
+        notice.FeriadoID || notice.RegistoRelacionadoID || "",
+      );
+      const holiday = holidayById.get(holidayId) || {};
+      return {
+        holidayId,
+        employeeId: employee.FuncionarioID,
+        name: notice.NomeFeriado || holiday.NomeFeriado || "Feriado",
+        date: notice.DataFeriado || holiday.Data || "",
+        balance: Number(employee.SaldoFolgas || 0),
+        credited: true,
+        acknowledged: receiptIds.has(
+          holidayLeaveRewardReceiptId(employee.FuncionarioID, holidayId),
+        ),
+        createdAt: notice.DataCriacao || "",
+      };
+    })
+    .filter((reward) => reward.holidayId && !reward.acknowledged)
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+};
+
+const monthlyLeaveRewardFor = async (profile, employee, month) => {
+  if (
+    !employee?.FuncionarioID ||
+    !isActiveEmployee(employee)
+  ) {
+    return null;
+  }
+  const movementId = `credito-mensal-${employee.FuncionarioID}-${month}`;
+  const creditedInBalance =
+    Number(employee.SaldoFolgasLancamentos?.[movementId]?.Delta || 0) === 1;
+  const notice = await runtime.getById(
+    "Notificacoes",
+    monthlyLeaveRewardNoticeId(employee.FuncionarioID, month),
+  );
+  const credited =
+    creditedInBalance ||
+    String(notice?.DestinatarioID || "") === String(employee.FuncionarioID);
+  if (!credited) return null;
+  const receiptId = monthlyLeaveRewardReceiptId(
+    employee.FuncionarioID,
+    month,
+  );
+  const receipt = await runtime.getById("ComunicadosLeituras", receiptId);
+  return {
+    month,
+    employeeId: employee.FuncionarioID,
+    balance: Number(employee.SaldoFolgas || 0),
+    credited: true,
+    acknowledged: Boolean(receipt),
+  };
+};
+
+const employeeEntryForTimeOff = async (record, profile) =>
+  runtime.resolveEmployeeEntry(
+    {
+      FuncionarioID: record.FuncionarioID,
+      funcionarioId: record.funcionarioId,
+      EmailFuncionario: record.EmailFuncionario,
+      NomeFuncionario: record.NomeFuncionario,
+      LojaID: record.LojaID || profile.LojaID || "",
+    },
+    { profile },
+  );
+
+const reconcileTimeOffBalance = async (
+  record,
+  profile,
+  knownEmployeeEntry = null,
+) => {
+  const employeeEntry =
+    knownEmployeeEntry || (await employeeEntryForTimeOff(record, profile));
+  const employee = employeeEntry?.record || null;
+  assert(employee, "Funcionário não encontrado para atualizar o saldo.");
+  if (!role(employee).includes("admin")) {
+    await applyMonthlyLeaveCredit(
+      employee,
+      profile,
+      todayIso().slice(0, 7),
+      employeeEntry.storageKey,
+    );
+  }
+  const units = timeOffBalanceUnits(record);
+  const approved = record.Status === APP.status.approved;
+  const movementId = `folga-${record.FolgaID}`;
+  const result = await runtime.applyEmployeeLeaveBalance({
+    employeeId: employee.FuncionarioID,
+    storageKey: employeeEntry.storageKey,
+    movementKey: movementId,
+    desiredDelta: approved ? -units : 0,
+    metadata: {
+      Tipo: approved ? "Débito de folga aprovada" : "Estorno de folga",
+      FolgaID: record.FolgaID,
+      DataInicio: record.DataInicio,
+      DataFim: record.DataFim,
+      Quantidade: units,
+    },
+  });
+  await saveLeaveBalanceMovement({
+    movementId,
+    employee,
+    type: approved ? "Débito de folga aprovada" : "Estorno de folga",
+    competence: String(record.DataInicio || "").slice(0, 7),
+    referenceId: record.FolgaID,
+    result,
+    actor: profile,
+  });
+  return result;
+};
+
+const reconcilePendingTimeOffBalances = async (profile, records) => {
+  if (!isManager(profile)) return 0;
+  const pending = records
+    .filter(
+      (record) =>
+        record.Status === APP.status.approved &&
+        record.SaldoFolgasStatus === "Pendente" &&
+        record.FolgaID,
+    )
+    .slice(0, 25);
+  let recovered = 0;
+  for (const record of pending) {
+    try {
+      const employeeEntry = await employeeEntryForTimeOff(record, profile);
+      if (!employeeEntry) continue;
+      await reconcileTimeOffBalance(record, profile, employeeEntry);
+      await runtime.patch("Folgas", record.FolgaID, {
+        SaldoFolgasStatus: "Aplicado",
+        SaldoFolgasErro: "",
+        SaldoFolgasUltimaTentativa: nowIso(),
+      });
+      recovered += 1;
+    } catch (error) {
+      console.warn(
+        `Saldo da folga ${record.FolgaID} ainda aguarda reconciliação:`,
+        error.message,
+      );
+    }
+  }
+  return recovered;
+};
+
+export async function audit(action, module, recordId, details = {}) {
+  const profile = await runtime.requireProfile();
+  const entry = {
+    AuditoriaID: uuid(),
+    DataHora: nowIso(),
+    EmailUtilizador: profile.Email,
+    NomeUtilizador: profile.Nome,
+    LojaID: profile.LojaID || details.LojaID || "",
+    FuncionarioID: profile.FuncionarioID || "",
+    Acao: action,
+    Modulo: module,
+    RegistoID: recordId || "",
+    DadosAnteriores: details.before || "",
+    DadosNovos: details.after || details,
+    EnderecoOuOrigem: "Aplicação Firebase",
+    Resultado: "Sucesso",
+    Mensagem: details.message || "",
+  };
+  await runtime.create("Auditoria", entry).catch((error) => {
+    console.warn("Auditoria não gravada:", error.message);
+  });
+}
+
+// Chaves de tipo de automação mapeadas por categoria de evento
+const WA_AUTOMATION_KEYS = Object.freeze({
+  "Folga":        "aut_folga_nova",
+  "FolgaAprovada": "aut_folga_aprovada",
+  "FolgaRecusada": "aut_folga_recusada",
+  "Atestado":     "aut_folga_nova",
+  "Troca":        "aut_troca_folga",
+  "Ponto":        "aut_ponto",
+  "Tarefa":       "aut_tarefas",
+  "Tarefas":      "aut_tarefas",
+  "Documentos":   "aut_documentos",
+  "Documento":   "aut_documentos",
+  "Comunicado":   "aut_comunicados",
+  "Comunicados":  "aut_comunicados",
+  "Aviso":        "aut_comunicados",
+  "Avisos":       "aut_comunicados",
+  "EspelhoPonto": "aut_espelho_ponto",
+  "Sistema":      null, // sem toggle específico — sempre envia
+});
+
+/**
+ * Retorna as configurações de automação WhatsApp salvas no Firestore/RTDB.
+ * Cache de 2 minutos para não sobrecarregar leituras.
+ */
+let _waAutomationsCache = null;
+let _waAutomationsCacheAt = 0;
+async function getWaAutomations() {
+  const now = Date.now();
+  if (_waAutomationsCache && now - _waAutomationsCacheAt < 120000) return _waAutomationsCache;
+  try {
+    const cfg = await runtime.getById("Configuracoes", "WhatsAppAutomations").catch(() => null);
+    _waAutomationsCache = cfg || {};
+    _waAutomationsCacheAt = now;
+  } catch (_) {
+    _waAutomationsCache = {};
+  }
+  return _waAutomationsCache;
+}
+
+// Cache de deduplicação e idempotência para disparos do WhatsApp
+const _waSentDedupe = new Map();
+
+function isWaDeduplicated(dedupeKey, cooldownMs) {
+  const now = Date.now();
+  const memTime = _waSentDedupe.get(dedupeKey) || 0;
+  if (now - memTime < cooldownMs) return true;
+
+  if (typeof localStorage !== "undefined") {
+    try {
+      const stored = Number(localStorage.getItem(`wa_dedupe_${dedupeKey}`) || 0);
+      if (now - stored < cooldownMs) return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
+function markWaDeduplicated(dedupeKey) {
+  const now = Date.now();
+  _waSentDedupe.set(dedupeKey, now);
+  if (typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(`wa_dedupe_${dedupeKey}`, String(now));
+    } catch (_) {}
+  }
+}
+
+/**
+ * Constrói texto da mensagem WhatsApp conforme tipo do evento,
+ * com templates humanizados por categoria.
+ */
+function buildWaText({ firstName, subject, message, type }) {
+  const greeting = firstName ? `Olá, *${firstName}*!\n\n` : "Olá!\n\n";
+  const isTask = type === "Tarefa" || String(type || "").startsWith("TAREFA");
+  const isCozinha = isTask;
+  const footer = isCozinha ? "\n\n_House 190 · CozinhaFlow_" : "\n\n_House 190_";
+  return `${greeting}*${subject}*\n${message}${footer}`;
+}
+
+/**
+ * Dispara notificação WhatsApp ao colaborador ou liderança da loja.
+ * Usa o Cloudflare Worker (/wa-send) como relay seguro quando disponível;
+ * faz fallback para chamada direta ao gateway WA-AKG em último caso.
+ * Respeita as configurações de automação salvas em Configuracoes/WhatsAppAutomations
+ * e aplica deduplicação estrita para evitar disparos repetidos.
+ */
+export async function dispatchWhatsAppNotification({ employeeId = "", storeId = "", email = "", subject = "", message = "", type = "", relatedId = "" }) {
+  if (typeof fetch === "undefined") return;
+  try {
+    // 1. Verifica se a automação para este tipo está explicitamente desabilitada
+    const automations = await getWaAutomations();
+    const automationKey = WA_AUTOMATION_KEYS[type];
+    if (automationKey && automations[automationKey] === false) return;
+
+    // Janela de cooldown por categoria:
+    // - Folga: 20 horas (evita reenviar lembrete no mesmo dia)
+    // - Ponto (intervalo): 15 minutos
+    // - Tarefas / Demais: 30 minutos
+    const isFolga = type === "Folga" || String(relatedId).includes("folga") || String(subject).toLowerCase().includes("folga");
+    const cooldownMs = isFolga ? 20 * 3600 * 1000 : (type === "Ponto" ? 15 * 60 * 1000 : 30 * 60 * 1000);
+
+    // 2. Localiza destinatários (colaborador individual ou gerência da loja)
+    const employees = await runtime.list("Funcionarios", { profile: null }).catch(() => []);
+    const targets = [];
+    if (employeeId) {
+      const targetId = String(employeeId).trim().toLowerCase();
+      const emp = employees.find((e) => {
+        const fId = String(e.FuncionarioID || e.funcionarioId || e.id || "").trim().toLowerCase();
+        const fName = String(e.Nome || e.nome || "").trim().toLowerCase();
+        const fEmail = String(e.Email || e.email || "").trim().toLowerCase();
+        return fId === targetId || fName === targetId || (fEmail && fEmail === targetId);
+      });
+      if (emp) targets.push(emp);
+    } else if (storeId) {
+      const managers = employees.filter(
+        (e) => (isManager(e) || isAdmin(e)) && (String(e.LojaID || "") === String(storeId) || isAdmin(e)) && e.Ativo !== false
+      );
+      targets.push(...managers.slice(0, 3));
+    }
+
+    if (!targets.length) return;
+
+    // 3. Obtém credenciais de relay do Worker ou Gateway direto
+    const defaultGatewayUrl = "https://house190-bot.loca.lt/api";
+    const defaultApiKey = "wag_lHoXJO4s0S0yX1cD1PMLkAu4ghGmrhBl";
+    const defaultWorkerUrl = "https://house-folgas-notifications.brunohouse.workers.dev";
+
+    const workerUrl = (() => {
+      try {
+        if (typeof window !== "undefined" && window.__PUSH_ENDPOINT__) return window.__PUSH_ENDPOINT__;
+      } catch (_) {}
+      return defaultWorkerUrl;
+    })();
+
+    const idToken = typeof window !== "undefined"
+      ? (await runtime.auth?.currentUser?.getIdToken?.().catch(() => "") || window.__SESSION_TOKEN__ || "")
+      : "";
+
+    const gwConfig = await runtime.getById("Configuracoes", "WhatsAppGateway").catch(() => null);
+    const rawGwUrl = gwConfig?.GatewayUrl || defaultGatewayUrl;
+    const gwUrl = rawGwUrl.endsWith("/api") ? rawGwUrl : `${rawGwUrl.replace(/\/+$/, "")}/api`;
+    const gwKey = gwConfig?.ApiKey || defaultApiKey;
+    const sessionId = gwConfig?.InstanceName || "house190";
+
+    const isBrowser = typeof window !== "undefined";
+    const shouldSendGateway = gwConfig?.Ativo === true || (isBrowser && gwConfig?.Ativo !== false);
+
+    for (const emp of targets) {
+      const rawPhone = emp?.WhatsApp || emp?.Telefone || emp?.Celular || emp?.whatsapp || emp?.telefone || emp?.celular || "";
+      if (!rawPhone) continue;
+
+      let digits = String(rawPhone).replace(/\D/g, "");
+      if (digits.startsWith("0")) digits = digits.slice(1);
+      if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+      if (digits.length < 10 || digits.length > 15) continue;
+
+      // Chave única de deduplicação por destinatário e evento
+      const dedupeKey = relatedId
+        ? `${digits}_${type}_${relatedId}`
+        : `${digits}_${type}_${subject}`;
+
+      if (isWaDeduplicated(dedupeKey, cooldownMs)) {
+        console.log(`[WA] Disparo deduplicado ignorado para ${digits} (${dedupeKey})`);
+        continue;
+      }
+
+      // Registra a chave antes do envio assíncrono para prevenir condições de corrida
+      markWaDeduplicated(dedupeKey);
+
+      const rawName = (emp.Nome || emp.nome || "").trim();
+      const firstName = rawName ? rawName.split(/\s+/)[0] : "";
+      const text = buildWaText({ firstName, subject, message, type });
+
+      let sent = false;
+      let messageId = "";
+
+      // 1. Tenta envio direto pelo Gateway Baileys (WA-AKG) se em navegador ou se gateway ativo
+      if (shouldSendGateway && gwUrl && gwKey) {
+        try {
+          const endpoint = `${gwUrl}/messages/${encodeURIComponent(sessionId)}/${encodeURIComponent(digits + "@s.whatsapp.net")}/send`;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": gwKey,
+              "bypass-tunnel-reminder": "true",
+            },
+            body: JSON.stringify({ message: { text } }),
+            signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
+          });
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data.status) {
+              sent = true;
+              messageId = data.data?.key?.id || data.data?.id || "sent";
+              console.log(`[WA] Notificação enviada via Gateway para ${digits} (${type}), ID: ${messageId}`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[WA] Disparo direto ao gateway falhou para ${digits}:`, err?.message || err);
+        }
+      }
+
+      // 2. Se não enviou pelo gateway direto, tenta via Cloudflare Worker
+      if (!sent && workerUrl) {
+        try {
+          const headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": gwKey,
+          };
+          if (idToken) headers["Authorization"] = `Bearer ${idToken}`;
+          const workerRes = await fetch(`${workerUrl}/wa-send`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ phone: digits, text }),
+            signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
+          });
+          if (workerRes.ok) {
+            const workerData = await workerRes.json().catch(() => ({}));
+            if (workerData.success) {
+              sent = true;
+              messageId = workerData.messageId || "sent_worker";
+              console.log(`[WA] Notificação enviada via Worker para ${digits} (${type}), ID: ${messageId}`);
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Registro de histórico de envio em Auditoria
+      try {
+        await runtime.upsert("Auditoria", {
+          AuditoriaID: uuid(),
+          Acao: "Disparo Automático WhatsApp",
+          Tabela: "WhatsAppDisparos",
+          RegistroID: digits,
+          Detalhes: {
+            Tipo: type,
+            Assunto: subject,
+            Destinatario: rawName,
+            Telefone: digits,
+            Status: sent ? "Enviado" : "Falha/GatewayOffline",
+            MessageID: messageId,
+            DataHora: nowIso(),
+          },
+          DataHora: nowIso(),
+          Usuario: "Sistema/WhatsApp",
+        });
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn("[WA] dispatchWhatsAppNotification falhou:", err?.message || err);
+  }
+}
+
+export async function createNotification({
+  employeeId = "",
+  email = "",
+  storeId = "",
+  subject,
+  message,
+  type = "Sistema",
+  relatedId = "",
+  severity = "info",
+}) {
+  dispatchWhatsAppNotification({ employeeId, storeId, email, subject, message, type, relatedId }).catch(() => {});
+
+  const notifId = relatedId
+    ? `notif_${String(relatedId).replace(/[^a-zA-Z0-9_-]/g, "_")}`
+    : uuid();
+
+  return runtime.upsert("Notificacoes", {
+    NotificacaoID: notifId,
+    Destinatario: normalizeEmail(email),
+    DestinatarioID: employeeId,
+    LojaID: storeId,
+    Assunto: subject,
+    Mensagem: message,
+    Tipo: type,
+    Severidade: severity,
+    Status: "Pendente",
+    DataCriacao: nowIso(),
+    DataEnvio: nowIso(),
+    DataLeitura: "",
+    LidoPor: "",
+    Canal: "Aplicação",
+    TentativasEnvio: 0,
+    LinkAcao: "",
+    Erro: "",
+    RegistoRelacionadoID: relatedId,
+  });
+}
+
+export async function createNotificationOnce({
+  employeeId = "",
+  email = "",
+  storeId = "",
+  subject,
+  message,
+  type = "Sistema",
+  relatedId = "",
+  severity = "info",
+}) {
+  if (relatedId) {
+    try {
+      const existing = await runtime.list("Notificacoes", { profile: null });
+      const found = existing.find(
+        (n) =>
+          n.Tipo === type &&
+          String(n.RegistoRelacionadoID || "") === String(relatedId) &&
+          (!employeeId || String(n.DestinatarioID || "") === String(employeeId))
+      );
+      if (found) return found;
+    } catch (_) {}
+  }
+  return createNotification({
+    employeeId,
+    email,
+    storeId,
+    subject,
+    message,
+    type,
+    relatedId,
+    severity,
+  });
+}
+
+const dashboardFrom = (stores, employees, records) => {
+  const today = todayIso();
+  const next = new Date(`${today}T12:00:00`);
+  next.setDate(next.getDate() + 7);
+  const nextKey = todayIso(next);
+  const active = records.filter((record) =>
+    [APP.status.approved, APP.status.pending].includes(record.Status),
+  );
+  return {
+    cards: {
+      totalFuncionariosAtivos: employees.filter((item) =>
+        asBoolean(item.Ativo),
+      ).length,
+      totalLojasAtivas: stores.filter((item) => asBoolean(item.Ativa)).length,
+      folgasHoje: active.filter(
+        (item) =>
+          String(item.DataInicio || "") <= today &&
+          String(item.DataFim || item.DataInicio || "") >= today,
+      ).length,
+      folgasProximos7Dias: active.filter(
+        (item) =>
+          String(item.DataInicio || "") >= today &&
+          String(item.DataInicio || "") <= nextKey,
+      ).length,
+      pedidosPendentes: records.filter(
+        (item) => item.Status === APP.status.pending,
+      ).length,
+    },
+    proximasFolgas: active
+      .filter(
+        (item) => String(item.DataFim || item.DataInicio || "") >= today,
+      )
+      .sort((a, b) =>
+        String(a.DataInicio || "").localeCompare(String(b.DataInicio || "")),
+      )
+      .slice(0, 10),
+  };
+};
+
+async function bootstrap() {
+  const profile = await runtime.requireProfile();
+  let stores = [], initialEmployees = [], timeOff = [], holidays = [];
+  try {
+    [stores, initialEmployees, timeOff, holidays] = await Promise.all([
+      runtime.list("Lojas", { profile }).catch(() => []),
+      runtime.list("Funcionarios", { profile }).catch(() => []),
+      runtime.list("Folgas", { profile }).catch(() => []),
+      runtime.list("Feriados", { profile }).catch(() => []),
+    ]);
+  } catch (loadErr) {
+    console.warn("Aviso ao carregar dados no bootstrap:", loadErr);
+  }
+  // Crédito mensal e reconciliações são executados em segundo plano sem bloquear o login
+  ensureMonthlyLeaveCredits(profile, initialEmployees).catch((error) =>
+    console.warn("Crédito mensal em segundo plano:", error.message),
+  );
+  reconcilePendingTimeOffBalances(profile, timeOff).catch((error) =>
+    console.warn("Reconciliação de saldos de folgas:", error.message),
+  );
+  const employees = initialEmployees;
+  const visibleTimeOff = timeOff;
+  const ownEmployee = currentEmployeeFrom(employees, profile);
+  const currentEmployee = ownEmployee || employees[0] || {};
+  const currentMonth = todayIso().slice(0, 7);
+  let monthlyLeaveReward = null;
+  try {
+    monthlyLeaveReward = await monthlyLeaveRewardFor(
+      profile,
+      ownEmployee,
+      currentMonth,
+    );
+  } catch (err) {
+    console.warn("Aviso ao calcular recompensa de folga:", err);
+  }
+  let holidayLeaveRewards = [];
+  try {
+    holidayLeaveRewards = await holidayLeaveRewardsFor(
+      profile,
+      ownEmployee,
+      holidays,
+    );
+  } catch (err) {
+    console.warn("Aviso ao calcular recompensas de feriados:", err);
+  }
+  const ownStoreId = String(profile.LojaID || currentEmployee.LojaID || "");
+  const ownStoreName = String(
+    profile.NomeLoja || currentEmployee.NomeLoja || "",
+  );
+  const effectiveProfile = {
+    ...profile,
+    Nome: profile.Nome || currentEmployee.Nome || "",
+    Email: profile.Email || currentEmployee.Email || "",
+    LojaID: ownStoreId,
+    NomeLoja: ownStoreName,
+    Cargo: profile.Cargo || currentEmployee.Cargo || "",
+  };
+  const visibleStores =
+    stores.length || !ownStoreId
+      ? stores
+      : [{ LojaID: ownStoreId, NomeLoja: ownStoreName || "Minha loja", Ativa: true }];
+  return {
+    app: { name: APP.name, version: APP.version },
+    user: sessionUser(effectiveProfile),
+    permissions: PERMISSIONS[profile.Perfil] || [],
+    stores: visibleStores,
+    employees,
+    timeOff: visibleTimeOff,
+    holidays,
+    users: [],
+    dashboard: dashboardFrom(visibleStores, employees, visibleTimeOff),
+    monthlyLeaveReward,
+    holidayLeaveRewards,
+    monthlyCreditReport: null,
+    deferred: false,
+    usersDeferred: isAdmin(profile),
+    performance: { mode: "firebase-direct", serverMs: 0 },
+  };
+}
+
+const normalizeStore = (payload, current, profile) => ({
+  ...(current || {}),
+  ...payload,
+  LojaID: current?.LojaID || payload.LojaID || uuid(),
+  NomeLoja: String(payload.NomeLoja || "").trim(),
+  CodigoLoja: String(payload.CodigoLoja || "").trim(),
+  CNPJ: String(payload.CNPJ || "").trim(),
+  Morada: String(payload.Morada || "").trim(),
+  Cidade: String(payload.Cidade || "").trim(),
+  ResponsavelNome: String(payload.ResponsavelNome || "").trim(),
+  ResponsavelEmail: normalizeEmail(payload.ResponsavelEmail),
+  CalendarID: String(payload.CalendarID || "").trim(),
+  LimiteFolgasPorDia: Math.max(1, Number(payload.LimiteFolgasPorDia || 1)),
+  DiasFuncionamento: payload.DiasFuncionamento || "1,2,3,4,5,6",
+  HorarioAbertura: payload.HorarioAbertura || "",
+  HorarioFecho: payload.HorarioFecho || "",
+  Ativa: payload.Ativa !== false,
+  DataCriacao: current?.DataCriacao || nowIso(),
+  CriadoPor: current?.CriadoPor || profile.Email,
+  DataAtualizacao: nowIso(),
+});
+
+const normalizeEmployee = async (payload, current, profile) => {
+  const store = payload.LojaID
+    ? await runtime.getById("Lojas", payload.LojaID)
+    : null;
+  return {
+    ...(current || {}),
+    ...payload,
+    FuncionarioID: current?.FuncionarioID || payload.FuncionarioID || uuid(),
+    Nome: String(payload.Nome || "").trim(),
+    Email: normalizeEmail(payload.Email),
+    Telefone: String(payload.Telefone || "").trim(),
+    LojaID: String(payload.LojaID || ""),
+    NomeLoja: store?.NomeLoja || payload.NomeLoja || "",
+    Cargo: String(payload.Cargo || "").trim(),
+    Perfil: payload.Perfil || APP.profiles.employee,
+    AvatarID: /^avatar-(0[0-9]|1[01])$/.test(String(payload.AvatarID || ""))
+      ? String(payload.AvatarID)
+      : current?.AvatarID || "avatar-00",
+    DataAdmissao: payload.DataAdmissao || "",
+    TipoContrato: payload.TipoContrato || "",
+    DiasTrabalhoSemana: payload.DiasTrabalhoSemana || "",
+    DiaFolgaPreferencial: payload.DiaFolgaPreferencial || "",
+    SegundoDiaFolgaPreferencial: payload.SegundoDiaFolgaPreferencial || "",
+    SaldoFolgas: Number(payload.SaldoFolgas || 0),
+    Ativo: payload.Ativo !== false,
+    DataCriacao: current?.DataCriacao || nowIso(),
+    CriadoPor: current?.CriadoPor || profile.Email,
+    DataAtualizacao: nowIso(),
+    CPF: String(payload.CPF || "").trim(),
+  };
+};
+
+const configValue = (rows, key, fallback) => {
+  const record = rows.find(
+    (item) =>
+      String(item.Chave || "").trim().toLowerCase() === key.toLowerCase(),
+  );
+  return record ? record.Valor : fallback;
+};
+
+const dayDistance = (from, to) => {
+  const first = new Date(`${from}T12:00:00`).getTime();
+  const last = new Date(`${to}T12:00:00`).getTime();
+  return Number.isFinite(first) && Number.isFinite(last)
+    ? Math.round((last - first) / 86400000)
+    : 0;
+};
+
+const dateKey = (value) => String(value || "").slice(0, 10);
+
+const weekdayLabels = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+];
+
+const operationalRuleMatches = (rule, employee, day) => {
+  if (!asBoolean(rule.Ativa)) return false;
+  if (rule.LojaID && String(rule.LojaID) !== String(employee.LojaID)) {
+    return false;
+  }
+  if (
+    rule.Cargo &&
+    String(rule.Cargo).toLowerCase() !== String(employee.Cargo || "").toLowerCase()
+  ) {
+    return false;
+  }
+  const configuredDay = String(rule.DiaSemana || "Todos").toLowerCase();
+  if (!configuredDay || configuredDay === "todos") return true;
+  const weekday = new Date(`${day}T12:00:00`).getDay();
+  return (
+    configuredDay === String(weekday) ||
+    weekdayLabels[weekday].toLowerCase().startsWith(configuredDay.slice(0, 5))
+  );
+};
+
+const validateTimeOffPolicies = async ({
+  profile,
+  employee,
+  start,
+  end,
+  current = null,
+  approving = false,
+  type = "",
+}) => {
+  const isMedical = String(type || current?.TipoFolga || "").toLowerCase().includes("atestado");
+  if (isMedical) return; // Atestados médicos legais não sofrem bloqueio de antecedência, feriado ou limite operacional
+  const requestedDays = dateRange(start, end);
+  const employeeRequest =
+    role(profile).includes("funcion") ||
+    role(profile).includes("chefe de cozinha");
+  const [config, holidays] = await Promise.all([
+    runtime.list("Configuracoes", { profile }),
+    runtime.list("Feriados", { profile }),
+  ]);
+
+  if (employeeRequest && !current) {
+    const today = todayIso();
+    const minimum = Math.max(
+      0,
+      Number(configValue(config, "Prazo mínimo de antecedência", 0)),
+    );
+    const maximum = Math.max(
+      minimum,
+      Number(configValue(config, "Prazo máximo para pedido", 180)),
+    );
+    const distance = dayDistance(today, start);
+    assert(
+      distance >= minimum,
+      `O pedido precisa ser feito com pelo menos ${minimum} dia(s) de antecedência.`,
+    );
+    assert(
+      distance <= maximum,
+      `O pedido só pode ser feito com até ${maximum} dia(s) de antecedência.`,
+    );
+    // Pedidos de funcionários aos sábados e domingos são permitidos em todas
+    // as lojas. Os demais limites operacionais continuam sendo validados.
+    if (
+      !asBoolean(configValue(config, "Permitir folga em feriado", true))
+    ) {
+      const holidayDays = new Set(
+        holidays
+          .filter((item) => item.Ativo !== false)
+          .filter(
+            (item) =>
+              !item.LojaID || String(item.LojaID) === String(employee.LojaID),
+          )
+          .map((item) => String(item.Data || "").slice(0, 10)),
+      );
+      assert(
+        !requestedDays.some((day) => holidayDays.has(day)),
+        "Pedidos de folga em feriados não estão permitidos.",
+      );
+    }
+  }
+
+  if (!approving) return;
+  const [store, records, employees, rules] = await Promise.all([
+    runtime.getById("Lojas", employee.LojaID),
+    runtime.list("Folgas", { profile }),
+    runtime.list("Funcionarios", { profile }),
+    runtime.list("RegrasOperacionais", { profile }),
+  ]);
+  const baseLimit = Math.max(
+    1,
+    Number(
+      store?.LimiteFolgasPorDia ||
+        configValue(
+          config,
+          "Limite padrão de funcionários de folga por dia",
+          1,
+        ),
+    ),
+  );
+  const activeEmployees = employees.filter(
+    (item) =>
+      asBoolean(item.Ativo) &&
+      String(item.LojaID) === String(employee.LojaID),
+  );
+
+  requestedDays.forEach((day) => {
+    const matchingRules = rules.filter((rule) =>
+      operationalRuleMatches(rule, employee, day),
+    );
+    const blockingRules = matchingRules.filter((rule) =>
+      String(rule.ModoValidacao || "Bloquear")
+        .toLowerCase()
+        .includes("bloque"),
+    );
+    const configuredLimits = blockingRules
+      .map((rule) => Number(rule.LimiteFolgasDia || 0))
+      .filter((value) => value > 0);
+    const dailyLimit = configuredLimits.length
+      ? Math.min(baseLimit, ...configuredLimits)
+      : baseLimit;
+    const approvedEmployeeIds = new Set(
+      records
+        .filter(
+          (item) =>
+            item.FolgaID !== current?.FolgaID &&
+            item.Status === APP.status.approved &&
+            String(item.LojaID) === String(employee.LojaID) &&
+            dateKey(item.DataInicio) <= day &&
+            dateKey(item.DataFim || item.DataInicio) >= day,
+        )
+        .map((item) => item.FuncionarioID),
+    );
+    approvedEmployeeIds.add(employee.FuncionarioID);
+    assert(
+      approvedEmployeeIds.size <= dailyLimit,
+      `O limite de ${dailyLimit} funcionário(s) de folga em ${day} foi atingido.`,
+    );
+    const requiredWorking = Math.max(
+      0,
+      ...blockingRules.map((rule) => Number(rule.MinimoTrabalhando || 0)),
+    );
+    if (requiredWorking) {
+      const working = activeEmployees.filter(
+        (item) => !approvedEmployeeIds.has(item.FuncionarioID),
+      ).length;
+      assert(
+        working >= requiredWorking,
+        `A aprovação deixaria somente ${working} funcionário(s) trabalhando em ${day}; o mínimo é ${requiredWorking}.`,
+      );
+    }
+  });
+};
+
+const createOrUpdateTimeOff = async (payload, current = null) => {
+  const profile = await runtime.requireProfile();
+  const employeeId =
+    payload.FuncionarioID ||
+    payload.funcionarioId ||
+    current?.FuncionarioID ||
+    profile.FuncionarioID;
+  const employee = await runtime.getById("Funcionarios", employeeId);
+  assert(employee, "Funcionário não encontrado.");
+  scopeRecord(profile, employee);
+  const start = String(payload.DataInicio || payload.dataInicio || "");
+  const end = String(payload.DataFim || payload.dataFim || start);
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(start), "Informe a data inicial.");
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(end), "Informe a data final.");
+  assert(end >= start, "A data final não pode ser anterior à data inicial.");
+  assert(
+    dateRange(start, end).length <= 30,
+    "Uma folga pode ter no máximo 30 dias.",
+  );
+  const records = await runtime.list("Folgas", { profile });
+  const conflict = records.find(
+    (item) =>
+      item.FolgaID !== current?.FolgaID &&
+      item.FuncionarioID === employeeId &&
+      ![APP.status.cancelled, APP.status.rejected].includes(item.Status) &&
+      dateKey(item.DataInicio) <= end &&
+      dateKey(item.DataFim || item.DataInicio) >= start,
+  );
+  assert(!conflict, "Já existe uma folga deste funcionário nesse período.");
+
+  const employeeRequest =
+    role(profile).includes("funcion") ||
+    role(profile).includes("chefe de cozinha");
+  const type = payload.TipoFolga || current?.TipoFolga || "Folga";
+  const period = payload.Periodo || current?.Periodo || "Dia inteiro";
+  if (
+    employeeRequest &&
+    !asBoolean(
+      configValue(
+        await runtime.list("Configuracoes", { profile }),
+        "Permitir meia folga",
+        true,
+      ),
+    )
+  ) {
+    assert(
+      !String(type).toLowerCase().includes("meia") &&
+        !["manhã", "manha", "tarde", "personalizado"].includes(
+          String(period).toLowerCase(),
+        ),
+      "Pedidos de meia folga não estão permitidos.",
+    );
+  }
+  const intendedStatus =
+    current?.Status ||
+    (employeeRequest ? APP.status.pending : payload.Status || APP.status.approved);
+
+  const units = timeOffBalanceUnits({
+    TipoFolga: type,
+    Periodo: period,
+    DataInicio: start,
+    DataFim: end,
+  });
+  const employeeBalance = Number(employee.SaldoFolgas || 0);
+
+  if (employeeRequest && units > 0) {
+    assert(
+      employeeBalance >= units,
+      `Você não possui saldo de folgas suficiente para este pedido. Saldo disponível: ${employeeBalance} folga(s), solicitado: ${units}.`,
+    );
+  }
+
+  await validateTimeOffPolicies({
+    profile,
+    employee,
+    start,
+    end,
+    current,
+    approving: intendedStatus === APP.status.approved,
+    type,
+  });
+  return {
+    ...(current || {}),
+    ...payload,
+    FolgaID: current?.FolgaID || payload.FolgaID || uuid(),
+    FuncionarioID: employee.FuncionarioID,
+    NomeFuncionario: employee.Nome,
+    EmailFuncionario: employee.Email,
+    LojaID: employee.LojaID,
+    NomeLoja: employee.NomeLoja,
+    DataInicio: start,
+    DataFim: end,
+    TipoFolga: type,
+    Periodo: period,
+    Motivo: String(payload.Motivo || payload.motivo || ""),
+    DocumentoID: payload.DocumentoID || payload.documentoId || current?.DocumentoID || "",
+    DocumentoUrl: payload.DocumentoUrl || payload.documentoUrl || current?.DocumentoUrl || "",
+    CRM: payload.CRM || payload.crm || current?.CRM || "",
+    Origem: employeeRequest ? "Pedido do funcionário" : payload.Origem || "Manual",
+    Status: intendedStatus,
+    SolicitadoPor: current?.SolicitadoPor || profile.Email,
+    DataSolicitacao: current?.DataSolicitacao || nowIso(),
+    DataCriacao: current?.DataCriacao || nowIso(),
+    DataAtualizacao: nowIso(),
+  };
+};
+
+const timeOffDecision = async (id, approved, observation = "") => {
+  const profile = await runtime.requireProfile();
+  requireManager(profile);
+  const current = await runtime.getById("Folgas", id);
+  assert(current, "Pedido de folga não encontrado.");
+  scopeRecord(profile, current);
+  assert(
+    current.Status === APP.status.pending,
+    "Somente pedidos pendentes podem receber uma decisão.",
+  );
+  let employeeEntry = null;
+  let employee = null;
+  if (approved) {
+    employeeEntry = await employeeEntryForTimeOff(current, profile);
+    employee = employeeEntry?.record
+      ? {
+          ...employeeEntry.record,
+          FuncionarioID:
+            employeeEntry.record.FuncionarioID ||
+            current.FuncionarioID ||
+            employeeEntry.storageKey,
+        }
+      : null;
+    if (employeeEntry && employee) {
+      employeeEntry = { ...employeeEntry, record: employee };
+    }
+    assert(
+      employee,
+      "Não foi possível aprovar: cadastro atual do funcionário não localizado. Corrija o vínculo e tente novamente.",
+    );
+    await validateTimeOffPolicies({
+      profile,
+      employee,
+      start: current.DataInicio,
+      end: current.DataFim || current.DataInicio,
+      current,
+      approving: true,
+      type: current.TipoFolga,
+    });
+  }
+  let updated = await runtime.patch("Folgas", id, {
+    ...(employee
+      ? {
+          FuncionarioID: employee.FuncionarioID,
+          NomeFuncionario: employee.Nome || current.NomeFuncionario,
+          EmailFuncionario: employee.Email || current.EmailFuncionario,
+          LojaID: employee.LojaID || current.LojaID,
+          NomeLoja: employee.NomeLoja || current.NomeLoja,
+        }
+      : {}),
+    Status: approved ? APP.status.approved : APP.status.rejected,
+    SaldoFolgasStatus: approved ? "Processando" : "Não aplicável",
+    AprovadoPor: profile.Email,
+    DataAprovacao: nowIso(),
+    ObservacaoAprovacao: String(observation || ""),
+    DataAtualizacao: nowIso(),
+  });
+  const isMedical = String(updated.TipoFolga || "").toLowerCase().includes("atestado");
+  if (approved) {
+    try {
+      await reconcileTimeOffBalance(updated, profile, employeeEntry);
+      updated = await runtime.patch("Folgas", id, {
+        SaldoFolgasStatus: "Aplicado",
+        SaldoFolgasErro: "",
+        SaldoFolgasUltimaTentativa: nowIso(),
+      });
+    } catch (error) {
+      updated = await runtime
+        .patch("Folgas", id, {
+          SaldoFolgasStatus: "Pendente",
+          SaldoFolgasErro: String(error?.message || error).slice(0, 180),
+          SaldoFolgasUltimaTentativa: nowIso(),
+        })
+        .catch(() => updated);
+      console.warn(
+        `Folga ${updated.FolgaID} aprovada; ajuste de saldo será reconciliado automaticamente:`,
+        error.message,
+      );
+    }
+
+    if (isMedical) {
+      // Abono automático das faltas no período do atestado (CLT / Portaria 671)
+      const days = dateRange(updated.DataInicio, updated.DataFim || updated.DataInicio);
+      for (const day of days) {
+        const justId = `${updated.FuncionarioID}__${day}`;
+        const existingJust = await runtime.getById("JustificativasPonto", justId).catch(() => null);
+        await runtime.upsert("JustificativasPonto", {
+          ...(existingJust || {}),
+          JustificativaPontoID: justId,
+          FuncionarioID: updated.FuncionarioID,
+          NomeFuncionario: updated.NomeFuncionario,
+          LojaID: updated.LojaID,
+          NomeLoja: updated.NomeLoja,
+          Data: day,
+          Tipo: "Atestado",
+          Observacao: `Atestado médico aprovado (Folga ID: ${id})`,
+          DocumentoUrl: updated.DocumentoUrl || "",
+          DocumentoID: updated.DocumentoID || "",
+          Status: "Aprovada",
+          DataCriacao: existingJust?.DataCriacao || nowIso(),
+          DataAtualizacao: nowIso(),
+          JustificadoPor: profile.Email,
+        });
+      }
+      if (updated.DocumentoID) {
+        await runtime.patch("Documentos", updated.DocumentoID, {
+          Status: "Aprovado",
+          AprovadoPor: profile.Email,
+          DataAprovacao: nowIso(),
+          DataAtualizacao: nowIso(),
+        }).catch(() => {});
+      }
+    }
+  } else if (isMedical && updated.DocumentoID) {
+    await runtime.patch("Documentos", updated.DocumentoID, {
+      Status: "Rejeitado",
+      ObservacaoRejeicao: String(observation || ""),
+      RejeitadoPor: profile.Email,
+      DataRejeicao: nowIso(),
+      DataAtualizacao: nowIso(),
+    }).catch(() => {});
+  }
+
+  const obsText = updated.ObservacaoDecisao ? ` Motivo: ${updated.ObservacaoDecisao}` : "";
+  const notifSubject = isMedical
+    ? (approved ? "Atestado médico aprovado" : "Atestado médico rejeitado")
+    : (approved ? "Folga aprovada" : "Folga rejeitada");
+  const notifMsg = isMedical
+    ? (approved
+        ? `Seu atestado médico de ${updated.DataInicio}${updated.DataFim && updated.DataFim !== updated.DataInicio ? " até " + updated.DataFim : ""} foi aprovado e as faltas no período foram abonadas!`
+        : `Seu atestado médico para ${updated.DataInicio} foi rejeitado.${obsText}`)
+    : (approved
+        ? `Seu pedido de folga para ${updated.DataInicio} foi aprovado!`
+        : `Seu pedido de folga para ${updated.DataInicio} foi rejeitado.${obsText}`);
+
+  await createNotification({
+    employeeId: updated.FuncionarioID,
+    email: updated.EmailFuncionario,
+    storeId: updated.LojaID,
+    subject: notifSubject,
+    message: notifMsg,
+    type: isMedical ? "Atestado" : "Folga",
+    relatedId: id,
+    severity: approved ? "success" : "warning",
+  }).catch((error) =>
+    console.warn("Notificação da decisão não gravada:", error.message),
+  );
+  await audit(
+    approved ? "Aprovar folga" : "Rejeitar folga",
+    "Folgas",
+    id,
+    { before: current, after: updated },
+  );
+  return updated;
+};
+
+const preferredWeekdayIndex = (value) => {
+  const normalized = String(value || "").toLowerCase();
+  const names = [
+    "domingo",
+    "segunda",
+    "terça",
+    "quarta",
+    "quinta",
+    "sexta",
+    "sábado",
+  ];
+  const index = names.findIndex((name) => normalized.startsWith(name.slice(0, 5)));
+  return index >= 0 ? index : null;
+};
+
+async function simulateSchedule(payload) {
+  const profile = await runtime.requireProfile();
+  requireManager(profile);
+  const employees = (await runtime.list("Funcionarios", { profile })).filter(
+    (item) =>
+      asBoolean(item.Ativo) &&
+      String(item.LojaID) === String(payload.LojaID || profile.LojaID),
+  );
+  const start = String(payload.DataInicio || "");
+  const end = String(payload.DataFim || start);
+  const days = dateRange(start, end);
+  const used = {};
+  const maximum = Math.max(1, Number(payload.MaximoPorDia || 1));
+  return employees.map((employee, index) => {
+    const preferred = preferredWeekdayIndex(employee.DiaFolgaPreferencial);
+    const candidates = days.filter((day) => {
+      const weekday = new Date(`${day}T12:00:00`).getDay();
+      return (
+        (preferred === null || weekday === preferred) &&
+        (asBoolean(payload.PermitirFimDeSemana) || ![0, 6].includes(weekday)) &&
+        Number(used[day] || 0) < maximum
+      );
+    });
+    const fallback = days.filter(
+      (day) => Number(used[day] || 0) < maximum,
+    );
+    const day =
+      candidates[index % Math.max(1, candidates.length)] ||
+      fallback[index % Math.max(1, fallback.length)] ||
+      days[index % Math.max(1, days.length)];
+    used[day] = Number(used[day] || 0) + 1;
+    return {
+      FuncionarioID: employee.FuncionarioID,
+      Funcionario: employee.Nome,
+      NomeFuncionario: employee.Nome,
+      LojaID: employee.LojaID,
+      DataSugerida: day,
+      DataInicio: day,
+      DataFim: day,
+      FolgaFixa: preferred !== null,
+      SaldoAntes: Number(employee.SaldoFolgas || 0),
+      Pontuacao: Math.max(10, 100 - Number(used[day] || 1) * 5),
+      MotivoEscolha:
+        preferred !== null
+          ? "Preferência de folga fixa respeitada"
+          : "Distribuição equilibrada na equipe",
+    };
+  });
+}
+
+export function createBaseHandlers() {
+  return {
+    async loginUser(args) {
+      const payload = args[0] || {};
+      const shouldRemember =
+        payload.remember === undefined && payload.ManterConectado === undefined
+          ? true
+          : asBoolean(payload.remember || payload.ManterConectado);
+      const user = await runtime.login(
+        payload.email || payload.Email,
+        payload.senha || payload.password || payload.Senha,
+        shouldRemember,
+      );
+      const data = await bootstrap();
+      const token = await user.getIdToken();
+      return success(
+        {
+          token,
+          sessionToken: token,
+          user: data.user,
+          rememberPersisted: shouldRemember,
+          rememberExpiresAt: shouldRemember
+            ? Date.now() + 180 * 24 * 60 * 60 * 1000
+            : 0,
+          bootstrap: data,
+        },
+        "Login realizado.",
+      );
+    },
+
+    async loginGoogleUser(args) {
+      const payload = args[0] || {};
+      const shouldRemember = payload.remember !== false;
+      const user = await runtime.loginWithGoogle(shouldRemember);
+      if (!user) {
+        return success({ redirecting: true }, "Redirecionando para login com o Google...");
+      }
+      const data = await bootstrap();
+      const token = await user.getIdToken();
+      return success(
+        {
+          token,
+          sessionToken: token,
+          user: data.user,
+          rememberPersisted: shouldRemember,
+          rememberExpiresAt: shouldRemember
+            ? Date.now() + 180 * 24 * 60 * 60 * 1000
+            : 0,
+          bootstrap: data,
+        },
+        "Login com Google realizado com sucesso.",
+      );
+    },
+
+    async perfilObter() {
+      const profile = await runtime.requireProfile();
+      return success(profile);
+    },
+
+    async getProfile() {
+      const profile = await runtime.requireProfile();
+      return success(profile);
+    },
+
+    async linkGoogleAccount() {
+      const res = await runtime.linkGoogleAccount();
+      const data = await bootstrap();
+      return success(
+        {
+          ...res,
+          user: data.user,
+        },
+        "Conta Google vinculada com sucesso! A partir de agora, entre com o Google.",
+      );
+    },
+
+    async logoutUser() {
+      await runtime.logout();
+      return success({}, "Sessão encerrada.");
+    },
+
+    async requestPasswordReset(args) {
+      await runtime.sendPasswordReset(args[0]?.email || args[0]?.Email);
+      return success({}, "E-mail de redefinição enviado.");
+    },
+
+    async confirmPasswordReset() {
+      throw new Error(
+        "Use o link seguro enviado pelo Firebase para concluir a redefinição.",
+      );
+    },
+
+    async getBootstrapDataWithSession() {
+      return success(await bootstrap(), "Aplicação carregada.");
+    },
+
+    async getDashboardData() {
+      const data = await bootstrap();
+      return success(data.dashboard, "Dashboard carregado.");
+    },
+
+    async acknowledgeMonthlyLeaveReward(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const month = String(payload.month || payload.competencia || "");
+      assert(/^\d{4}-\d{2}$/.test(month), "Competência mensal inválida.");
+      const employees = await runtime.list("Funcionarios", { profile });
+      const employee = currentEmployeeFrom(employees, profile);
+      assert(employee?.FuncionarioID, "Funcionário não encontrado.");
+      const movementId = `credito-mensal-${employee.FuncionarioID}-${month}`;
+      const noticeId = monthlyLeaveRewardNoticeId(
+        employee.FuncionarioID,
+        month,
+      );
+      const notice = await runtime.getById("Notificacoes", noticeId);
+      assert(
+        Number(employee.SaldoFolgasLancamentos?.[movementId]?.Delta || 0) ===
+          1 ||
+          String(notice?.DestinatarioID || "") ===
+            String(employee.FuncionarioID),
+        "A folga extra deste mês ainda não foi creditada.",
+      );
+      const receiptId = monthlyLeaveRewardReceiptId(
+        employee.FuncionarioID,
+        month,
+      );
+      const existing = await runtime.getById(
+        "ComunicadosLeituras",
+        receiptId,
+      );
+      if (existing) {
+        if (notice && notice.Status !== "Lida") {
+          await runtime
+            .patch("Notificacoes", noticeId, {
+              Status: "Lida",
+              DataLeitura: nowIso(),
+              LidoPor: profile.Email || "",
+            })
+            .catch(() => {});
+        }
+        return success(existing, "Aviso já visualizado.");
+      }
+      const saved = await runtime.upsert("ComunicadosLeituras", {
+        LeituraID: receiptId,
+        ComID: `folga-extra-aviso-v3-${month}`,
+        FuncionarioID: employee.FuncionarioID,
+        LojaID: employee.LojaID || profile.LojaID || "",
+        Tipo: "Folga extra mensal",
+        Competencia: month,
+        LidoEm: nowIso(),
+        UserAgent: String(globalThis.navigator?.userAgent || "").slice(0, 300),
+      });
+      if (notice) {
+        await runtime
+          .patch("Notificacoes", noticeId, {
+            Status: "Lida",
+            DataLeitura: nowIso(),
+            LidoPor: profile.Email || "",
+          })
+          .catch(() => {});
+      }
+      return success(saved, "Aviso visualizado.");
+    },
+
+    async acknowledgeHolidayLeaveReward(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const holidayId = String(payload.holidayId || payload.FeriadoID || "");
+      assert(holidayId, "Feriado inválido.");
+      const employees = await runtime.list("Funcionarios", { profile });
+      const employee = currentEmployeeFrom(employees, profile);
+      assert(employee?.FuncionarioID, "Funcionário não encontrado.");
+      const movementId = holidayLeaveCreditMovementId(
+        employee.FuncionarioID,
+        holidayId,
+      );
+      const noticeId = holidayLeaveRewardNoticeId(
+        employee.FuncionarioID,
+        holidayId,
+      );
+      const notice = await runtime.getById("Notificacoes", noticeId);
+      assert(
+        Number(employee.SaldoFolgasLancamentos?.[movementId]?.Delta || 0) ===
+          1 ||
+          String(notice?.DestinatarioID || "") ===
+            String(employee.FuncionarioID),
+        "A folga extra deste feriado ainda não foi creditada.",
+      );
+      const receiptId = holidayLeaveRewardReceiptId(
+        employee.FuncionarioID,
+        holidayId,
+      );
+      const existing = await runtime.getById(
+        "ComunicadosLeituras",
+        receiptId,
+      );
+      if (existing) {
+        if (notice && notice.Status !== "Lida") {
+          await runtime
+            .patch("Notificacoes", noticeId, {
+              Status: "Lida",
+              DataLeitura: nowIso(),
+              LidoPor: profile.Email || "",
+            })
+            .catch(() => {});
+        }
+        return success(existing, "Aviso já visualizado.");
+      }
+      const saved = await runtime.upsert("ComunicadosLeituras", {
+        LeituraID: receiptId,
+        ComID: holidayLeaveRewardReceiptBaseId(holidayId),
+        FuncionarioID: employee.FuncionarioID,
+        LojaID: employee.LojaID || profile.LojaID || "",
+        Tipo: "Folga extra de feriado",
+        FeriadoID: holidayId,
+        LidoEm: nowIso(),
+        UserAgent: String(globalThis.navigator?.userAgent || "").slice(0, 300),
+      });
+      if (notice) {
+        await runtime
+          .patch("Notificacoes", noticeId, {
+            Status: "Lida",
+            DataLeitura: nowIso(),
+            LidoPor: profile.Email || "",
+          })
+          .catch(() => {});
+      }
+      return success(saved, "Aviso do feriado visualizado.");
+    },
+
+    async getStores() {
+      return success(await runtime.list("Lojas"));
+    },
+
+    async listarLojas() {
+      return this.getStores();
+    },
+
+    async createStore(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const payload = args[0] || {};
+      assert(String(payload.NomeLoja || "").trim(), "Informe o nome da loja.");
+      const saved = await runtime.upsert(
+        "Lojas",
+        normalizeStore(payload, null, profile),
+      );
+      await audit("Criar loja", "Lojas", saved.LojaID, { after: saved });
+      return success(saved, "Loja criada.");
+    },
+
+    async updateStore(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const [id, payload] = args;
+      const current = await runtime.getById("Lojas", id);
+      assert(current, "Loja não encontrada.");
+      const saved = await runtime.upsert(
+        "Lojas",
+        normalizeStore(payload || {}, current, profile),
+      );
+      await audit("Atualizar loja", "Lojas", id, {
+        before: current,
+        after: saved,
+      });
+      return success(saved, "Loja atualizada.");
+    },
+
+    async disableStore(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const saved = await runtime.patch("Lojas", args[0], {
+        Ativa: false,
+        DataAtualizacao: nowIso(),
+      });
+      return success(saved, "Loja desativada.");
+    },
+
+    async activateStore(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const saved = await runtime.patch("Lojas", args[0], {
+        Ativa: true,
+        DataAtualizacao: nowIso(),
+      });
+      return success(saved, "Loja ativada.");
+    },
+
+    async getEmployees() {
+      return success(await runtime.list("Funcionarios"));
+    },
+
+    async createEmployee(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const payload = args[0] || {};
+      assert(String(payload.Nome || "").trim(), "Informe o nome.");
+      assert(normalizeEmail(payload.Email), "Informe um e-mail válido.");
+      const saved = await runtime.upsert(
+        "Funcionarios",
+        await normalizeEmployee(payload, null, profile),
+      );
+      await audit("Criar funcionário", "Funcionarios", saved.FuncionarioID, {
+        after: saved,
+      });
+      return success(saved, "Funcionário criado.");
+    },
+
+    async updateEmployee(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const [id, payload] = args;
+      const current = await runtime.getById("Funcionarios", id);
+      assert(current, "Funcionário não encontrado.");
+      scopeRecord(profile, current);
+      const saved = await runtime.upsert(
+        "Funcionarios",
+        await normalizeEmployee(payload || {}, current, profile),
+      );
+      await audit("Atualizar funcionário", "Funcionarios", id, {
+        before: current,
+        after: saved,
+      });
+      return success(saved, "Funcionário atualizado.");
+    },
+
+    async disableEmployee(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const id = args[0];
+      const saved = await runtime.patch("Funcionarios", id, {
+        Ativo: false,
+        DataAtualizacao: nowIso(),
+      });
+      const access = (await runtime.listAccess()).find(
+        (item) => item.FuncionarioID === id,
+      );
+      if (access) {
+        await runtime.saveAccess(access.UsuarioID, {
+          ...access,
+          Ativo: false,
+          DataAtualizacao: nowIso(),
+        });
+      }
+      return success(saved, "Funcionário desativado.");
+    },
+
+    async activateEmployee(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const id = args[0];
+      const saved = await runtime.patch("Funcionarios", id, {
+        Ativo: true,
+        DataAtualizacao: nowIso(),
+      });
+      const access = (await runtime.listAccess()).find(
+        (item) => item.FuncionarioID === id,
+      );
+      if (access) {
+        await runtime.saveAccess(access.UsuarioID, {
+          ...access,
+          Ativo: true,
+          DataAtualizacao: nowIso(),
+        });
+      }
+      return success(saved, "Funcionário ativado.");
+    },
+
+    async deleteEmployee(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const payload = args[0];
+      const id =
+        typeof payload === "object" && payload !== null
+          ? payload.funcionarioId || payload.FuncionarioID || payload.id
+          : payload;
+      assert(id, "ID do funcionário não informado.");
+
+      const current = await runtime.getById("Funcionarios", id);
+      assert(current, "Funcionário não encontrado.");
+      scopeRecord(profile, current);
+
+      await runtime.delete("Funcionarios", id);
+
+      const accessList = await runtime.listAccess();
+      const access = accessList.find(
+        (item) =>
+          String(item.FuncionarioID) === String(id) ||
+          String(item.funcionarioId) === String(id),
+      );
+      if (access && access.UsuarioID) {
+        await runtime.deleteAccess(access.UsuarioID).catch(() => {});
+      }
+
+      const schedules = await runtime.list("JornadasPonto").catch(() => []);
+      const schedule = schedules.find(
+        (s) => String(s.FuncionarioID) === String(id),
+      );
+      if (schedule && schedule.JornadaID) {
+        await runtime
+          .delete("JornadasPonto", schedule.JornadaID)
+          .catch(() => {});
+      }
+
+      await audit("Excluir funcionário", "Funcionarios", id, {
+        before: current,
+        after: null,
+      }).catch(() => {});
+
+      return success(
+        { FuncionarioID: id },
+        "Funcionário excluído definitivamente.",
+      );
+    },
+
+    async getTimeOffRecords() {
+      return success(await runtime.list("Folgas"));
+    },
+
+    async validateTimeOffRequest(args) {
+      const payload = args[0] || {};
+      await createOrUpdateTimeOff(payload);
+      return success({ valid: true }, "Pedido válido.");
+    },
+
+    async createTimeOff(args) {
+      const profile = await runtime.requireProfile();
+      const saved = await runtime.upsert(
+        "Folgas",
+        await createOrUpdateTimeOff(args[0] || {}),
+      );
+      if (isManager(profile)) {
+        try {
+          await reconcileTimeOffBalance(saved, profile);
+        } catch (error) {
+          await runtime.delete("Folgas", saved.FolgaID).catch(() => {});
+          throw error;
+        }
+      }
+      await audit("Criar folga", "Folgas", saved.FolgaID, { after: saved });
+      return success(saved, "Folga criada.");
+    },
+
+    async createEmployeeTimeOffRequest(args) {
+      const values = dropClientToken(args);
+      const saved = await runtime.upsert(
+        "Folgas",
+        await createOrUpdateTimeOff(values[0] || {}),
+      );
+      await audit("Solicitar folga", "Folgas", saved.FolgaID, {
+        after: saved,
+      });
+      createNotification({
+        storeId: saved.LojaID,
+        subject: "Nova solicitação de folga",
+        message: `${saved.NomeFuncionario || "Colaborador"} solicitou folga para ${saved.DataInicio}. Acesse o Gestão de Folgas para avaliar.`,
+        type: "Folga",
+        relatedId: saved.FolgaID,
+        severity: "info",
+      }).catch(() => {});
+      return success(saved, "Pedido de folga enviado.");
+    },
+
+    async updateTimeOff(args) {
+      const [id, payload] = args;
+      const profile = await runtime.requireProfile();
+      const current = await runtime.getById("Folgas", id);
+      assert(current, "Folga não encontrada.");
+      scopeRecord(profile, current);
+      if (!isManager(profile)) {
+        assert(
+          current.Status === APP.status.pending,
+          "Somente pedidos pendentes podem ser alterados pelo funcionário.",
+        );
+        assert(
+          !payload?.Status ||
+            [APP.status.pending, APP.status.cancelled].includes(payload.Status),
+          "O funcionário não pode aprovar nem reabrir o próprio pedido.",
+        );
+      }
+      const saved = await runtime.upsert(
+        "Folgas",
+        await createOrUpdateTimeOff(payload || {}, current),
+      );
+      if (isManager(profile)) {
+        try {
+          await reconcileTimeOffBalance(saved, profile);
+        } catch (error) {
+          await runtime.upsert("Folgas", current).catch(() => {});
+          throw error;
+        }
+      }
+      await audit("Atualizar folga", "Folgas", id, {
+        before: current,
+        after: saved,
+      });
+      return success(saved, "Folga atualizada.");
+    },
+
+    async cancelTimeOff(args) {
+      const [id, reason] = args;
+      const profile = await runtime.requireProfile();
+      const current = await runtime.getById("Folgas", id);
+      assert(current, "Folga não encontrada.");
+      scopeRecord(profile, current);
+      if (!isManager(profile)) {
+        assert(
+          current.Status === APP.status.pending,
+          "Somente pedidos pendentes podem ser cancelados pelo funcionário.",
+        );
+      }
+      const saved = await runtime.patch("Folgas", id, {
+        Status: APP.status.cancelled,
+        CanceladoPor: profile.Email,
+        DataCancelamento: nowIso(),
+        MotivoCancelamento: String(reason || ""),
+        DataAtualizacao: nowIso(),
+      });
+      if (isManager(profile)) {
+        try {
+          await reconcileTimeOffBalance(saved, profile);
+        } catch (error) {
+          await runtime.upsert("Folgas", current).catch(() => {});
+          throw error;
+        }
+      }
+      await audit("Cancelar folga", "Folgas", id, {
+        before: current,
+        after: saved,
+      });
+      return success(saved, "Folga cancelada.");
+    },
+
+    async approveTimeOff(args) {
+      return success(
+        await timeOffDecision(args[0], true, args[1]),
+        "Pedido aprovado.",
+      );
+    },
+
+    async rejectTimeOff(args) {
+      return success(
+        await timeOffDecision(args[0], false, args[1]),
+        "Pedido rejeitado.",
+      );
+    },
+
+    async decideTimeOffWithSession(args) {
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const approved =
+        String(payload.acao || "").toLowerCase() === "aprovar" ||
+        payload.approved === true;
+      return success(
+        await timeOffDecision(
+          payload.folgaId || payload.FolgaID || payload.id,
+          approved,
+          payload.observacao || payload.ObservacaoAprovacao,
+        ),
+        approved ? "Pedido aprovado." : "Pedido rejeitado.",
+      );
+    },
+
+    async submitMedicalCertificate(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employeeRequest =
+    role(profile).includes("funcion") ||
+    role(profile).includes("chefe de cozinha");
+
+      const employeeId = employeeRequest
+        ? profile.FuncionarioID
+        : (payload.funcionarioId || payload.FuncionarioID || profile.FuncionarioID);
+      assert(employeeId, "Identificação do funcionário é obrigatória.");
+
+      const employee = await runtime.getById("Funcionarios", employeeId);
+      assert(employee && asBoolean(employee.Ativo), "Funcionário não encontrado ou inativo.");
+      scopeRecord(profile, employee);
+
+      const start = String(payload.dataInicio || payload.DataInicio || "").trim();
+      const end = String(payload.dataFim || payload.DataFim || start).trim();
+      assert(/^\d{4}-\d{2}-\d{2}$/.test(start), "Informe a data inicial válida.");
+      assert(/^\d{4}-\d{2}-\d{2}$/.test(end), "Informe a data final válida.");
+      assert(end >= start, "A data final não pode ser anterior à data inicial.");
+      assert(dateRange(start, end).length <= 60, "O atestado não pode ultrapassar 60 dias.");
+
+      const docUrl = String(payload.documentoUrl || payload.DocumentoUrl || "").trim();
+      const docBase64 = String(payload.documentoBase64 || payload.base64 || payload.base64Data || "").trim();
+      assert(docUrl || docBase64, "É obrigatório anexar a foto ou PDF do atestado.");
+
+      const docId = `DOC_ATESTADO_${Date.now()}_${uuid().slice(0, 6)}`;
+      const folgaId = uuid();
+      const diasAbono = dateRange(start, end).length;
+
+      // 1. Grava no banco de Documentos
+      const docRecord = {
+        DocumentoID: docId,
+        DocID: docId,
+        Titulo: `Atestado Médico (${start}${end !== start ? " até " + end : ""})`,
+        Tipo: "Atestado Médico",
+        OrigemTipo: "UPLOAD_COLABORADOR",
+        Status: "Pendente",
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        CPFFuncionario: employee.CPF || "",
+        LojaID: employee.LojaID,
+        NomeLoja: employee.NomeLoja,
+        DataEnvio: nowIso(),
+        ArquivoUrl: docUrl,
+        ArquivoOriginalBase64: docBase64.length < 2000000 ? docBase64 : "",
+        HashOriginalSHA256: payload.hash || "",
+        CRM: String(payload.crm || payload.CRM || "").trim(),
+        Observacao: String(payload.motivo || payload.Motivo || "").trim(),
+        FolgaID: folgaId,
+        PeriodoAbono: `${start} a ${end}`,
+        DiasAbono: diasAbono,
+      };
+      await runtime.upsert("Documentos", docRecord);
+
+      // 2. Grava a solicitação em Folgas para aprovação do gestor
+      const folgaRecord = {
+        FolgaID: folgaId,
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        EmailFuncionario: employee.Email,
+        LojaID: employee.LojaID,
+        NomeLoja: employee.NomeLoja,
+        DataInicio: start,
+        DataFim: end,
+        TipoFolga: "Atestado Médico",
+        Periodo: "Dia inteiro",
+        Motivo: String(payload.motivo || payload.Motivo || "Atestado médico").trim(),
+        CRM: String(payload.crm || payload.CRM || "").trim(),
+        DocumentoID: docId,
+        DocumentoUrl: docUrl,
+        DiasAbono: diasAbono,
+        Origem: "Portal do Colaborador - Atestado Médico",
+        Status: APP.status.pending,
+        SolicitadoPor: profile.Email,
+        DataSolicitacao: nowIso(),
+        DataCriacao: nowIso(),
+        DataAtualizacao: nowIso(),
+      };
+      const savedFolga = await runtime.upsert("Folgas", folgaRecord);
+
+      await audit("Enviar atestado médico", "Documentos", docId, {
+        after: { documento: docRecord, folga: savedFolga },
+      });
+
+      createNotification({
+        storeId: savedFolga.LojaID,
+        subject: "Novo atestado médico enviado",
+        message: `${savedFolga.NomeFuncionario || "Colaborador"} enviou atestado médico de ${savedFolga.DataInicio} (${savedFolga.DiasAbono || 1} dia(s)). Acesse para homologar.`,
+        type: "Atestado",
+        relatedId: savedFolga.FolgaID,
+        severity: "info",
+      }).catch(() => {});
+
+      return success(
+        { documento: docRecord, folga: savedFolga },
+        "Atestado médico enviado com sucesso! Aguardando aprovação da gerência para abono das faltas.",
+      );
+    },
+
+    async getHolidays() {
+      return success(await runtime.list("Feriados"));
+    },
+
+    async createHoliday(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const payload = args[0] || {};
+      assert(
+        String(payload.NomeFeriado || "").trim(),
+        "Informe o nome do feriado.",
+      );
+      assert(
+        /^\d{4}-\d{2}-\d{2}$/.test(String(payload.Data || "")),
+        "Informe a data do feriado.",
+      );
+      const saved = await runtime.upsert("Feriados", {
+        ...payload,
+        FeriadoID: payload.FeriadoID || uuid(),
+        Nacional: payload.Tipo === "Nacional",
+        Regional: payload.Tipo === "Regional",
+        Municipal: payload.Tipo === "Municipal",
+        Ativo: payload.Ativo !== false,
+        DataCriacao: nowIso(),
+        CriadoPor: profile.Email,
+      });
+      const employees = await runtime.list("Funcionarios", { profile });
+      const creditReport = await ensureHolidayLeaveCredits(
+        profile,
+        saved,
+        employees,
+      );
+      await audit("Criar feriado", "Feriados", saved.FeriadoID, {
+        after: saved,
+        message: `Crédito de feriado confirmado para ${creditReport.confirmed} funcionário(s).`,
+      });
+      return success(
+        { ...saved, CreditoFolgaRelatorio: creditReport },
+        "Feriado criado com folga extra.",
+      );
+    },
+
+    async updateHoliday(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const [id, payload] = args;
+      const current = await runtime.getById("Feriados", id);
+      assert(current, "Feriado não encontrado.");
+      const saved = await runtime.upsert("Feriados", {
+        ...current,
+        ...payload,
+        FeriadoID: id,
+      });
+      if (saved.Ativo !== false) {
+        const employees = await runtime.list("Funcionarios", { profile });
+        await ensureHolidayLeaveCredits(profile, saved, employees);
+      }
+      return success(saved, "Feriado atualizado.");
+    },
+
+    async simulateAutomaticTimeOff(args) {
+      const suggestions = await simulateSchedule(args[0] || {});
+      return success(
+        { suggestions, simulacao: suggestions },
+        "Simulação concluída.",
+      );
+    },
+
+    async simulateAutomaticTimeOffWithAI(args) {
+      const suggestions = (await simulateSchedule(args[0] || {})).map(
+        (item) => ({
+          ...item,
+          AnaliseIA: "Aprovado",
+          ObservacaoIA:
+            "Distribuição revisada localmente, sem enviar dados a serviços externos.",
+        }),
+      );
+      return success({
+        sugestoes: suggestions,
+        resumoIA:
+          "A escala foi revisada com regras locais para preservar o plano gratuito.",
+        alertasIA: [],
+      });
+    },
+
+    async generateAutomaticTimeOff(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const suggestions = Array.isArray(args[1]) ? args[1] : [];
+      const saved = [];
+      for (const item of suggestions) {
+        const record = await runtime.upsert(
+          "Folgas",
+          await createOrUpdateTimeOff({
+            ...item,
+            DataInicio: item.DataInicio || item.DataSugerida,
+            DataFim: item.DataFim || item.DataSugerida,
+            Origem: "Geração automática",
+            Status: APP.status.approved,
+          }),
+        );
+        await reconcileTimeOffBalance(record, profile);
+        saved.push(record);
+      }
+      return success(saved, `${saved.length} folga(s) gerada(s).`);
+    },
+
+    async getAuditLogs() {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const rows = await runtime.list("Auditoria", { profile });
+      return success(
+        rows
+          .sort((a, b) => String(b.DataHora).localeCompare(String(a.DataHora)))
+          .slice(0, 500),
+      );
+    },
+
+    async exportReportToCsv() {
+      const profile = await runtime.requireProfile();
+      const rows = await runtime.list("Folgas", { profile });
+      const columns = [
+        "FolgaID",
+        "NomeFuncionario",
+        "NomeLoja",
+        "DataInicio",
+        "DataFim",
+        "TipoFolga",
+        "Status",
+        "Motivo",
+      ];
+      return success({
+        url: csvDataUrl(rows, columns),
+        name: "relatorio-folgas.csv",
+      });
+    },
+
+    async exportReportToPdf() {
+      throw new Error(
+        "Use a opção de impressão do navegador e escolha “Salvar como PDF”.",
+      );
+    },
+
+    async exportCalendarToPdf() {
+      throw new Error("Use a versão de impressão do calendário.");
+    },
+
+    async getUsers() {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      return success(await runtime.listAccess());
+    },
+
+    async createUser(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      assert(
+        String(payload.Senha || "").length >= 10,
+        "A senha inicial deve ter pelo menos 10 caracteres.",
+      );
+      const employee = payload.FuncionarioID
+        ? await runtime.getById("Funcionarios", payload.FuncionarioID)
+        : null;
+      if (payload.FuncionarioID) {
+        assert(employee, "Funcionário não encontrado.");
+      }
+      let saved = null;
+      const uid = await runtime.createAuthUser(
+        payload.Email,
+        payload.Senha,
+        async (createdUid) => {
+          saved = {
+            UsuarioID: createdUid,
+            FuncionarioID: payload.FuncionarioID || "",
+            Nome: payload.Nome || employee?.Nome || "",
+            Email: normalizeEmail(payload.Email || employee?.Email),
+            Perfil: payload.Perfil || employee?.Perfil || APP.profiles.employee,
+            LojaID: payload.LojaID || employee?.LojaID || "",
+            NomeLoja: employee?.NomeLoja || "",
+            Cargo: employee?.Cargo || "",
+            PrimeiroAcesso: payload.PrimeiroAcesso !== false,
+            Ativo: payload.Ativo !== false,
+            DataCriacao: nowIso(),
+            DataAtualizacao: nowIso(),
+          };
+          let accessCreated = false;
+          try {
+            await runtime.saveAccess(createdUid, saved);
+            accessCreated = true;
+            if (employee) {
+              await runtime.patch("Funcionarios", employee.FuncionarioID, {
+                AuthUID: createdUid,
+                Email: saved.Email,
+                Perfil: saved.Perfil,
+              });
+            }
+          } catch (error) {
+            if (accessCreated) {
+              await runtime.deleteAccess(createdUid).catch(() => {});
+            }
+            throw error;
+          }
+        },
+      );
+      await audit("Criar acesso", "Usuarios", uid, { after: saved });
+      return success(saved, "Acesso criado.");
+    },
+
+    async updateUser(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const values = dropClientToken(args);
+      const [id, payload] = values;
+      const current = await runtime.getAccess(id);
+      assert(current, "Acesso não encontrado.");
+      const saved = {
+        ...current,
+        ...payload,
+        UsuarioID: id,
+        // O administrador não consegue trocar com segurança o e-mail do
+        // Firebase Auth de outra pessoa. Preserve o endereço já vinculado.
+        Email: normalizeEmail(current.Email),
+        Ativo: payload.Ativo !== false,
+        DataAtualizacao: nowIso(),
+      };
+      delete saved.Senha;
+      delete saved.EnviarRedefinicao;
+      await runtime.saveAccess(id, saved);
+      if (asBoolean(payload.EnviarRedefinicao)) {
+        await runtime.sendPasswordReset(current.Email);
+      }
+      if (saved.FuncionarioID) {
+        await runtime.patch("Funcionarios", saved.FuncionarioID, {
+          Email: saved.Email,
+          Perfil: saved.Perfil,
+          LojaID: saved.LojaID,
+          Ativo: saved.Ativo,
+          DataAtualizacao: nowIso(),
+        });
+      }
+      await audit("Atualizar acesso", "Usuarios", id, {
+        before: current,
+        after: saved,
+      });
+      return success(saved, "Acesso atualizado.");
+    },
+
+    async adminSendPasswordReset(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const email = normalizeEmail(payload.email || payload.Email);
+      assert(email, "E-mail não informado.");
+      await runtime.sendPasswordReset(email);
+      await audit("Enviar redefinição de senha", "Usuarios", email, { email });
+      return success(
+        { email },
+        `Link seguro de redefinição de senha enviado para ${email}.`,
+      );
+    },
+
+    async updateOwnProfile(args) {
+      const profile = await runtime.requireProfile();
+      const payload = args[0] || {};
+      const email = normalizeEmail(payload.Email || profile.Email);
+      const password =
+        payload.NovaSenha || payload.novaSenha || payload.newPassword || "";
+      if (password) {
+        assert(password.length >= 10, "A nova senha deve ter 10 caracteres.");
+        assert(
+          password ===
+            (payload.ConfirmarNovaSenha ||
+              payload.confirmarNovaSenha ||
+              payload.passwordConfirmation),
+          "A confirmação da nova senha não confere.",
+        );
+      }
+      const currentPassword =
+        payload.SenhaAtual ||
+        payload.senhaAtual ||
+        payload.currentPassword ||
+        "";
+      assert(
+        !password || email === normalizeEmail(profile.Email),
+        "Altere o e-mail e a senha em etapas separadas.",
+      );
+      const saved = {
+        ...profile,
+        Email: email,
+        AvatarID: /^avatar-(0[0-9]|1[01])$/.test(
+          String(payload.AvatarID || ""),
+        )
+          ? String(payload.AvatarID)
+          : profile.AvatarID || "avatar-00",
+        FotoPerfil: "",
+        PrimeiroAcesso: password ? false : profile.PrimeiroAcesso,
+        DataAtualizacao: nowIso(),
+      };
+      await runtime.saveAccess(profile.UsuarioID, saved);
+      try {
+        await runtime.updateOwnAuth({
+          email,
+          password,
+          currentPassword,
+        });
+      } catch (error) {
+        await runtime.saveAccess(profile.UsuarioID, profile).catch(() => {});
+        throw error;
+      }
+      if (saved.FuncionarioID) {
+        await runtime
+          .patch("Funcionarios", saved.FuncionarioID, {
+            Email: email,
+            AvatarID: saved.AvatarID,
+            DataAtualizacao: nowIso(),
+          })
+          .catch((error) => {
+            if (!isPermissionDenied(error)) {
+              console.warn(
+                "Cadastro administrativo não sincronizado:",
+                error.message,
+              );
+            }
+          });
+      }
+      return success(saved, "Perfil atualizado.");
+    },
+
+    async acknowledgePrivacyPolicy(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const now = nowIso();
+      const version = String(
+        payload.version || payload.PoliticaPrivacidadeVersao || "1.0",
+      ).trim();
+      const rubricBase64 = String(
+        payload.signature ||
+          payload.RubricaBase64 ||
+          payload.PoliticaPrivacidadeAssinatura ||
+          "",
+      ).trim();
+
+      const updateData = {
+        PoliticaPrivacidadeCiente: true,
+        PoliticaPrivacidadeData: now,
+        PoliticaPrivacidadeVersao: version,
+        PoliticaPrivacidadeAssinatura: rubricBase64,
+        DataAtualizacao: now,
+      };
+
+      if (profile.UsuarioID) {
+        await runtime.saveAccess(profile.UsuarioID, {
+          ...profile,
+          ...updateData,
+        });
+      }
+
+      if (profile.FuncionarioID) {
+        await runtime
+          .patch("Funcionarios", profile.FuncionarioID, {
+            PoliticaPrivacidadeCiente: true,
+            PoliticaPrivacidadeData: now,
+            PoliticaPrivacidadeVersao: version,
+            PoliticaPrivacidadeAssinatura: rubricBase64,
+            DataAtualizacao: now,
+          })
+          .catch((error) => {
+            if (!isPermissionDenied(error)) {
+              console.warn(
+                "Aviso ao registrar ciência no funcionário:",
+                error.message,
+              );
+            }
+          });
+      }
+
+      await audit(
+        "Registro de ciência da Política de Privacidade",
+        "Usuarios",
+        profile.UsuarioID,
+        {
+          versao: version,
+          data: now,
+          temRubrica: Boolean(rubricBase64),
+          dispositivo: String(payload.device || payload.dispositivo || ""),
+        },
+      );
+
+      return success(
+        {
+          PoliticaPrivacidadeCiente: true,
+          PoliticaPrivacidadeData: now,
+          PoliticaPrivacidadeVersao: version,
+        },
+        "Ciência e assinatura da Política de Privacidade registradas com sucesso.",
+      );
+    },
+  };
+}
+
+export { bootstrap, dropClientToken, isAdmin, isManager, requireAdmin, requireManager, scopeRecord };

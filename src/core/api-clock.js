@@ -1,0 +1,3119 @@
+import { runtime } from "./runtime.js";
+import {
+  asBoolean,
+  assert,
+  csvDataUrl,
+  haversineMeters,
+  minutesBetween,
+  minutesText,
+  monthIso,
+  nowIso,
+  todayIso,
+  uuid,
+  sha256Hex,
+} from "./utils.js";
+import {
+  audit,
+  createNotification,
+  dropClientToken,
+  isAdmin,
+  requireAdmin,
+  requireManager,
+  scopeRecord,
+  success,
+} from "./api-base.js";
+import { SELFIE_DRIVE_UPLOAD_ENDPOINT } from "../selfie-drive-config.js";
+
+const clockTypes = [
+  "ENTRADA",
+  "SAIDA_INTERVALO",
+  "RETORNO_INTERVALO",
+  "SEM_DESCANSO",
+  "SAIDA_FINAL",
+];
+
+const clockJustificationTypes = [
+  "Atestado",
+  "Folga trocada",
+  "Dia concedido",
+  "Outros",
+];
+
+const selfieDriveEndpoint = () => {
+  const endpoint = String(SELFIE_DRIVE_UPLOAD_ENDPOINT || "").trim();
+  assert(
+    /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(
+      endpoint,
+    ),
+    "O envio seguro das selfies ao Google Drive ainda não foi configurado.",
+  );
+  return endpoint;
+};
+
+const warmSelfieDriveService = async () => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+  try {
+    await fetch(selfieDriveEndpoint(), {
+      method: "GET",
+      mode: "no-cors",
+      cache: "no-store",
+      credentials: "omit",
+      signal: controller.signal,
+    });
+  } catch {
+    // O POST continuará funcionando mesmo se o aquecimento for bloqueado.
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const uploadClockSelfieToDrive = async ({
+  selfieDataUrl,
+  requestId,
+  day,
+  type,
+}) => {
+  const selfie = String(selfieDataUrl || "");
+  assert(
+    /^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/.test(selfie),
+    "Capture a selfie antes de confirmar o ponto.",
+  );
+  assert(
+    selfie.length <= 950000,
+    "A selfie ficou muito grande. Tire outra foto para continuar.",
+  );
+  const user = runtime.auth?.currentUser;
+  assert(user, "Sua sessão expirou. Entre novamente.");
+  let idToken = await user.getIdToken();
+  assert(idToken, "Não foi possível validar sua sessão. Entre novamente.");
+  const performUpload = async (timeoutMs) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(selfieDriveEndpoint(), {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        redirect: "follow",
+        credentials: "omit",
+        signal: controller.signal,
+        body: JSON.stringify({
+          action: "uploadClockSelfie",
+          idToken,
+          requestId,
+          day,
+          clockType: type,
+          selfieDataUrl: selfie,
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  let response;
+  try {
+    response = await performUpload(20000);
+  } catch (firstError) {
+    console.warn(
+      "[ponto] Primeira tentativa de envio ao Google Drive falhou, tentando novamente:",
+      firstError?.message || firstError,
+    );
+    try {
+      try {
+        idToken = await user.getIdToken(true);
+      } catch {
+        // Mantém o token existente se a renovação pela rede falhar
+      }
+      response = await performUpload(25000);
+    } catch (secondError) {
+      console.error(
+        "[ponto] Falha definitiva no envio da selfie ao Google Drive:",
+        secondError?.message || secondError,
+      );
+      if (secondError?.name === "AbortError" || firstError?.name === "AbortError") {
+        throw new Error(
+          "O Google Drive demorou demais para responder. Tente novamente; a selfie não será duplicada.",
+        );
+      }
+      throw new Error(
+        "Não foi possível enviar a selfie ao Google Drive. Verifique a internet e tente novamente.",
+      );
+    }
+  }
+  const text = await response.text();
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    throw new Error("O Google Drive devolveu uma resposta inválida.");
+  }
+  assert(
+    response.ok && result?.ok && result?.fileId,
+    result?.error || "O Google Drive não confirmou o envio da selfie.",
+  );
+  return {
+    fileId: String(result.fileId),
+    fileUrl: String(result.fileUrl || ""),
+    fileName: String(result.fileName || ""),
+    uploadedAt: String(result.uploadedAt || nowIso()),
+  };
+};
+
+const timeValue = (dateTime) => {
+  const date = new Date(dateTime);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleTimeString("pt-BR", {
+        timeZone: "America/Bahia",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+};
+
+const extractScheduleTime = (val) => {
+  if (!val) return "";
+  const s = String(val).trim();
+  const hhmm = s.match(/^(\d{1,2}):(\d{2})/);
+  if (hhmm) return `${hhmm[1].padStart(2, "0")}:${hhmm[2]}`;
+  const embedded = s.match(/[T\s](\d{1,2}):(\d{2})/);
+  if (embedded) return `${embedded[1].padStart(2, "0")}:${embedded[2]}`;
+  const tv = timeValue(s);
+  if (tv) return tv;
+  return s.slice(0, 5);
+};
+
+const calculateSuggestedExit = (sched, entryTimeOrDateTime) => {
+  const schedExit = extractScheduleTime(sched?.HoraSaida);
+  if (schedExit && /^([01]\d|2[0-3]):[0-5]\d$/.test(schedExit)) {
+    return schedExit;
+  }
+  if (entryTimeOrDateTime) {
+    const directMatch = String(entryTimeOrDateTime).match(/^(\d{1,2}):(\d{2})/);
+    const tv = directMatch
+      ? `${directMatch[1].padStart(2, "0")}:${directMatch[2]}`
+      : timeValue(entryTimeOrDateTime);
+    const m = String(tv || "").match(/^(\d{1,2}):(\d{2})/);
+    if (m) {
+      const entryMins = Number(m[1]) * 60 + Number(m[2]);
+      const dailyMinutes =
+        Number(sched?.CargaDiariaMinutos || 440) +
+        Number(sched?.DuracaoIntervaloMinutos || 60);
+      const exitMins = (entryMins + dailyMinutes) % 1440;
+      const h = Math.floor(exitMins / 60);
+      const min = exitMins % 60;
+      return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+    }
+  }
+  return "23:00";
+};
+
+const formatScheduleTime = (schedule) => {
+  if (!schedule?.HoraEntrada || !schedule?.HoraSaida) return "";
+  const fmt = (val) => {
+    const s = String(val || "");
+    // Already "HH:MM" or "HH:MM:SS"
+    const hhmm = s.match(/^(\d{1,2}:\d{2})/);
+    if (hhmm) return hhmm[1];
+    // ISO timestamp like "1899-12-31T18:34:00"
+    const tv = timeValue(s);
+    if (tv) return tv;
+    return s.slice(0, 5);
+  };
+  const entry = fmt(schedule.HoraEntrada);
+  const exit = fmt(schedule.HoraSaida);
+  return entry && exit ? `${entry} às ${exit}` : "";
+};
+
+const normalizedDateKey = (value) => {
+  const text = String(value || "");
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text;
+};
+
+const normalizedWeekday = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+export const isFixedOffForDate = (
+  employee,
+  dateKey,
+  timeOffRecords = [],
+) => {
+  if (
+    !employee ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ""))
+  ) {
+    return false;
+  }
+  const weekday = [
+    "domingo",
+    "segunda",
+    "terça",
+    "quarta",
+    "quinta",
+    "sexta",
+    "sábado",
+  ][new Date(`${dateKey}T12:00:00`).getDay()];
+  const recurring = [
+    employee.DiaFolgaPreferencial,
+    employee.SegundoDiaFolgaPreferencial,
+  ]
+    .filter(Boolean)
+    .some((day) =>
+      normalizedWeekday(day).startsWith(
+        normalizedWeekday(weekday).slice(0, 5),
+      ),
+    );
+  if (!recurring) return false;
+  return !timeOffRecords.some(
+    (item) =>
+      String(item.FuncionarioID || "") ===
+        String(employee.FuncionarioID || "") &&
+      ["Aprovada", "Concluída"].includes(item.Status) &&
+      normalizedDateKey(item.FolgaFixaSubstituidaData) === dateKey,
+  );
+};
+
+const firstPunchDatesByEmployee = (records = []) => {
+  const starts = new Map();
+  records
+    .filter(
+      (item) =>
+        item.FuncionarioID &&
+        item.Status !== "Substituído" &&
+        item.TipoMarcacao === "ENTRADA" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          normalizedDateKey(item.Data || item.DataHora),
+        ),
+    )
+    .forEach((item) => {
+      const employeeId = String(item.FuncionarioID);
+      const date = normalizedDateKey(item.Data || item.DataHora);
+      const current = starts.get(employeeId);
+      if (!current || date < current) starts.set(employeeId, date);
+    });
+  return starts;
+};
+
+const workdayIndexes = (schedule) =>
+  String(schedule?.DiasTrabalho || "1,2,3,4,5,6")
+    .split(/[,;|\s]+/)
+    .map(Number)
+    .filter((value) => Number.isInteger(value) && value >= 0 && value <= 7)
+    .map((value) => (value === 7 ? 0 : value));
+
+const fixedOffWeekdayIndexes = (employee) => {
+  const names = [
+    "domingo",
+    "segunda",
+    "terca",
+    "quarta",
+    "quinta",
+    "sexta",
+    "sabado",
+  ];
+  return [
+    employee?.DiaFolgaPreferencial,
+    employee?.SegundoDiaFolgaPreferencial,
+  ]
+    .filter(Boolean)
+    .map((day) => {
+      const norm = normalizedWeekday(day);
+      return names.findIndex((name) => norm.startsWith(name.slice(0, 4)));
+    })
+    .filter((idx) => idx >= 0);
+};
+
+const isScheduledWorkday = (schedule, employee, weekday) => {
+  if (!schedule) return false;
+  const fixedIndexes = fixedOffWeekdayIndexes(employee);
+  if (fixedIndexes.length > 0) {
+    return !fixedIndexes.includes(weekday);
+  }
+  return workdayIndexes(schedule).includes(weekday);
+};
+
+const defaultScheduleFor = (employeeId, storeId = "", email = "") => ({
+  JornadaPontoID: `default-${String(employeeId || "padrao")}`,
+  FuncionarioID: employeeId,
+  EmailFuncionario: email,
+  LojaID: storeId,
+  TipoJornada: "Padrão",
+  CargaDiariaMinutos: 440,
+  CargaSemanalMinutos: 2640,
+  HoraEntrada: "08:00",
+  HoraSaidaIntervalo: "12:00",
+  HoraRetornoIntervalo: "13:00",
+  HoraSaida: "16:20",
+  DuracaoIntervaloMinutos: 60,
+  DiasTrabalho: "0,1,2,3,4,5,6",
+  ToleranciaMinutos: 15,
+  BancoHorasAtivo: true,
+  Ativa: true,
+  VigenteDe: "2020-01-01",
+  VigenteAte: "",
+});
+
+const scheduleFor = (schedules, employeeId, dateKey = todayIso()) => {
+  const normId = String(employeeId ?? "").trim();
+  const candidates = (schedules || [])
+    .filter(
+      (item) =>
+        String(item.FuncionarioID ?? "").trim() === normId &&
+        asBoolean(item.Ativa) &&
+        (!item.VigenteDe || normalizedDateKey(item.VigenteDe) <= dateKey) &&
+        (!item.VigenteAte || normalizedDateKey(item.VigenteAte) >= dateKey),
+    )
+    .sort((a, b) =>
+      String(b.VigenteDe || "").localeCompare(String(a.VigenteDe || "")),
+    );
+  return candidates[0] || null;
+};
+
+const sequenceFor = (schedule) =>
+  Number(schedule?.DuracaoIntervaloMinutos || 0) > 0
+    ? ["ENTRADA", "SAIDA_INTERVALO", "RETORNO_INTERVALO", "SAIDA_FINAL"]
+    : ["ENTRADA", "SAIDA_FINAL"];
+
+const dateTimeNumber = (value) => {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const compareRecordsByDateTime = (a, b) =>
+  dateTimeNumber(a?.DataHora) - dateTimeNumber(b?.DataHora);
+
+const nextClockAction = (records, schedule) => {
+  const types = records
+    .filter((item) => item.Status !== "Substituído")
+    .sort(compareRecordsByDateTime)
+    .map((item) => item.TipoMarcacao);
+  if (types.includes("SAIDA_FINAL")) return "";
+  if (types.includes("SEM_DESCANSO")) return "SAIDA_FINAL";
+  return sequenceFor(schedule).find((type) => !types.includes(type)) || "";
+};
+
+const previousDateKey = (dateKey) => {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() - 1);
+  return todayIso(date);
+};
+
+const operationalDayFor = (
+  records,
+  schedules,
+  employeeId,
+  now = new Date(),
+) => {
+  const currentDay = todayIso(now);
+  const previousDay = previousDateKey(currentDay);
+  const normId = String(employeeId ?? "").trim();
+  const previousRecords = (records || [])
+    .filter(
+      (item) =>
+        String(item.FuncionarioID ?? "").trim() === normId &&
+        normalizedDateKey(item.Data) === previousDay &&
+        item.Status !== "Substituído",
+    )
+    .sort(compareRecordsByDateTime);
+  const hasOpenShift =
+    previousRecords.some((item) => item.TipoMarcacao === "ENTRADA") &&
+    !previousRecords.some((item) => item.TipoMarcacao === "SAIDA_FINAL");
+  if (!hasOpenShift) return currentDay;
+
+  const lastTimestamp = Math.max(
+    ...previousRecords.map((item) => new Date(item.DataHora).getTime()),
+  );
+  const withinSameShift =
+    Number.isFinite(lastTimestamp) &&
+    now.getTime() - lastTimestamp >= 0 &&
+    now.getTime() - lastTimestamp <= 18 * 60 * 60 * 1000;
+  return withinSameShift &&
+    (scheduleFor(schedules, employeeId, previousDay) || defaultScheduleFor(employeeId))
+    ? previousDay
+    : currentDay;
+};
+
+const exactMinutesBetween = (start, end) => {
+  const first = new Date(start).getTime();
+  const last = new Date(end).getTime();
+  return Number.isFinite(first) && Number.isFinite(last)
+    ? Math.max(0, (last - first) / 60000)
+    : 0;
+};
+
+const clockMinutes = (value) => {
+  const text = String(value || "");
+  const plain = text.match(/^(\d{1,2}):(\d{2})/);
+  if (plain) return Number(plain[1]) * 60 + Number(plain[2]);
+  const embedded = text.match(/[T\s](\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (embedded) return Number(embedded[1]) * 60 + Number(embedded[2]);
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.getUTCHours() * 60 + date.getUTCMinutes()
+    : null;
+};
+
+const scheduleExpectedMinutes = (schedule) => {
+  const start = clockMinutes(schedule?.HoraEntrada);
+  const firstExit = clockMinutes(schedule?.HoraSaidaIntervalo);
+  const secondEntry = clockMinutes(schedule?.HoraRetornoIntervalo);
+  const end = clockMinutes(schedule?.HoraSaida);
+  if (
+    asBoolean(schedule?.HorarioFlexivelDoisTurnos) &&
+    start !== null &&
+    firstExit !== null &&
+    secondEntry !== null &&
+    end !== null
+  ) {
+    const firstPeriod = (firstExit - start + 24 * 60) % (24 * 60);
+    const secondPeriod = (end - secondEntry + 24 * 60) % (24 * 60);
+    if (firstPeriod > 0 && secondPeriod > 0) return firstPeriod + secondPeriod;
+  }
+  if (start !== null && end !== null) {
+    const gross = (end - start + 24 * 60) % (24 * 60);
+    const net = gross - Number(schedule?.DuracaoIntervaloMinutos || 0);
+    if (net > 0) return net;
+  }
+  return Number(schedule?.CargaDiariaMinutos || 0);
+};
+
+const balanceDays = (days) =>
+  days.filter(
+    (item) =>
+      (!item.folga || item.trabalhou) &&
+      (!item.folgaFixa || item.trabalhou) &&
+      !item.justificado &&
+      !item.saldoPendente,
+  );
+
+const MAX_DAILY_WORK_MINUTES = 12 * 60;
+
+const getLocalTimeParts = (dateTime) => {
+  if (!dateTime) return null;
+  const d = new Date(dateTime);
+  if (!Number.isFinite(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bahia",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const h = Number(parts.find((p) => p.type === "hour")?.value);
+  const m = Number(parts.find((p) => p.type === "minute")?.value);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return { hour: h % 24, minute: m, totalMinutes: (h % 24) * 60 + m };
+};
+
+const midnightDiffMinutes = (dateTime, shiftDate) => {
+  if (!dateTime) return null;
+  const d = new Date(dateTime);
+  if (!Number.isFinite(d.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bahia",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+
+  const getP = (type) => parts.find((p) => p.type === type)?.value;
+  const exitYear = Number(getP("year"));
+  const exitMonth = Number(getP("month"));
+  const exitDay = Number(getP("day"));
+  const exitHour = Number(getP("hour")) % 24;
+  const exitMinute = Number(getP("minute"));
+
+  if (!Number.isFinite(exitYear) || !Number.isFinite(exitHour)) return null;
+
+  let sY = exitYear;
+  let sM = exitMonth;
+  let sD = exitDay;
+
+  if (shiftDate && /^\d{4}-\d{2}-\d{2}$/.test(String(shiftDate))) {
+    [sY, sM, sD] = String(shiftDate).split("-").map(Number);
+  } else if (exitHour < 12) {
+    const prev = new Date(Date.UTC(exitYear, exitMonth - 1, exitDay - 1));
+    sY = prev.getUTCFullYear();
+    sM = prev.getUTCMonth() + 1;
+    sD = prev.getUTCDate();
+  }
+
+  const nextDayUtc = Date.UTC(sY, sM - 1, sD + 1);
+  const exitDayUtc = Date.UTC(exitYear, exitMonth - 1, exitDay);
+  const daysDiff = Math.round((exitDayUtc - nextDayUtc) / (24 * 3600 * 1000));
+
+  return daysDiff * 1440 + exitHour * 60 + exitMinute;
+};
+
+const dayMetrics = (records, schedule, options = {}) => {
+  const ordered = records
+    .filter((item) => item.Status !== "Substituído")
+    .sort(compareRecordsByDateTime);
+  const scheduledBreak = Math.max(
+    0,
+    Number(schedule?.DuracaoIntervaloMinutos || 0),
+  );
+  const shifts = [];
+  let openShift = null;
+  let unmatchedEntry = false;
+
+  ordered.forEach((record) => {
+    if (record.TipoMarcacao === "ENTRADA") {
+      if (openShift) unmatchedEntry = true;
+      openShift = { entry: record, records: [] };
+      return;
+    }
+    if (!openShift) return;
+    if (record.TipoMarcacao === "SAIDA_FINAL") {
+      shifts.push({ ...openShift, exit: record });
+      openShift = null;
+      return;
+    }
+    openShift.records.push(record);
+  });
+
+  const rawWorked = shifts.reduce((total, shift) => {
+    const breakOut = shift.records.find(
+      (item) => item.TipoMarcacao === "SAIDA_INTERVALO",
+    );
+    const breakIn = breakOut
+      ? shift.records.find(
+          (item) =>
+            item.TipoMarcacao === "RETORNO_INTERVALO" &&
+            dateTimeNumber(item.DataHora) >= dateTimeNumber(breakOut.DataHora),
+        )
+      : null;
+    const breakMinutes = breakOut
+      ? breakIn
+        ? exactMinutesBetween(breakOut.DataHora, breakIn.DataHora)
+        : scheduledBreak
+      : 0;
+    return (
+      total +
+      Math.max(
+        0,
+        exactMinutesBetween(shift.entry.DataHora, shift.exit.DataHora) -
+          breakMinutes,
+      )
+    );
+  }, 0);
+
+  const entry = shifts[0]?.entry || openShift?.entry || null;
+  const exit = shifts[shifts.length - 1]?.exit || null;
+  const displayRecords = shifts.flatMap((shift) => shift.records);
+  if (openShift) displayRecords.push(...openShift.records);
+  const breakOut = displayRecords.find(
+    (item) => item.TipoMarcacao === "SAIDA_INTERVALO",
+  );
+  const breakIn = displayRecords.find(
+    (item) => item.TipoMarcacao === "RETORNO_INTERVALO",
+  );
+  const noBreak = displayRecords.find(
+    (item) => item.TipoMarcacao === "SEM_DESCANSO",
+  );
+  const requiresMiddlePunches =
+    Number(schedule?.DuracaoIntervaloMinutos || 0) > 0 ||
+    asBoolean(schedule?.HorarioFlexivelDoisTurnos);
+  const middlePunchesComplete =
+    !requiresMiddlePunches || Boolean(noBreak) || Boolean(breakOut && breakIn);
+  const reviewRequired = rawWorked > MAX_DAILY_WORK_MINUTES;
+  const worked = Math.min(rawWorked, MAX_DAILY_WORK_MINUTES);
+  const expected =
+    options.expectedMinutes === undefined
+      ? scheduleExpectedMinutes(schedule)
+      : Math.max(0, Number(options.expectedMinutes || 0));
+  let rawBalance = worked - expected;
+  const tolerance = Math.max(0, Number(schedule?.ToleranciaMinutos || 0));
+  let balance = Math.abs(rawBalance) <= tolerance ? 0 : rawBalance;
+
+  const isSplitShift = asBoolean(schedule?.HorarioFlexivelDoisTurnos);
+  const exitSchedMinutes = clockMinutes(schedule?.HoraSaida);
+  const isMidnightClosing =
+    !isSplitShift &&
+    Boolean(schedule?.HoraSaida) &&
+    (exitSchedMinutes === 0 || exitSchedMinutes >= 23 * 60 + 40);
+
+  if (isMidnightClosing && expected > 0 && exit && entry) {
+    const shiftDate = options.dateKey || exit.Data || entry.Data || "";
+    const exitDiff = midnightDiffMinutes(exit.DataHora, shiftDate);
+    if (exitDiff !== null) {
+      let entryDeficit = 0;
+      const startMinutes = clockMinutes(schedule?.HoraEntrada);
+      if (startMinutes !== null) {
+        const entryParts = getLocalTimeParts(entry.DataHora);
+        if (entryParts && entryParts.totalMinutes > startMinutes) {
+          const rawDeficit = entryParts.totalMinutes - startMinutes;
+          entryDeficit = rawDeficit <= tolerance ? 0 : rawDeficit;
+        }
+      }
+
+      let totalActualBreak = 0;
+      shifts.forEach((shift) => {
+        const bOut = shift.records.find((item) => item.TipoMarcacao === "SAIDA_INTERVALO");
+        const bIn = bOut
+          ? shift.records.find(
+              (item) =>
+                item.TipoMarcacao === "RETORNO_INTERVALO" &&
+                dateTimeNumber(item.DataHora) >= dateTimeNumber(bOut.DataHora),
+            )
+          : null;
+        if (bOut && bIn) {
+          totalActualBreak += exactMinutesBetween(bOut.DataHora, bIn.DataHora);
+        } else if (bOut && !bIn) {
+          totalActualBreak += scheduledBreak;
+        }
+      });
+      const breakExcess = Math.max(0, totalActualBreak - scheduledBreak);
+      const breakSuppressed = Math.max(0, scheduledBreak - totalActualBreak);
+      const exitContrib = exitDiff > 0 ? exitDiff : (exitDiff >= -20 ? 0 : exitDiff);
+      rawBalance = exitContrib - entryDeficit - breakExcess + breakSuppressed;
+      balance = Math.abs(rawBalance) <= tolerance ? 0 : rawBalance;
+    }
+  }
+  return {
+    entrada: entry ? timeValue(entry.DataHora) : "",
+    saidaIntervalo: breakOut ? timeValue(breakOut.DataHora) : noBreak ? "Sem descanso" : "",
+    retornoIntervalo: breakIn ? timeValue(breakIn.DataHora) : "",
+    saida: exit ? timeValue(exit.DataHora) : "",
+    worked,
+    rawWorked,
+    expected,
+    rawBalance,
+    tolerance,
+    balance,
+    hasPunches: ordered.length > 0,
+    complete:
+      shifts.length > 0 &&
+      !openShift &&
+      !unmatchedEntry &&
+      middlePunchesComplete,
+    reviewRequired,
+  };
+};
+
+const dayBalanceState = (dateKey, metrics, currentDate = todayIso()) => {
+  const isPastDay = String(dateKey) < String(currentDate);
+
+  // Dia de hoje ou futuro ainda não finalizado
+  if (!isPastDay) {
+    const pending = !metrics.complete || metrics.reviewRequired;
+    return {
+      pending,
+      minutes: pending ? 0 : metrics.balance,
+      text: pending
+        ? "—"
+        : (metrics.balance >= 0 ? "+" : "") + minutesText(metrics.balance),
+    };
+  }
+
+  // Turno que excedeu o limite máximo (12h) e requer revisão administrativa
+  if (metrics.reviewRequired) {
+    return {
+      pending: true,
+      minutes: 0,
+      text: "—",
+    };
+  }
+
+  // Dia anterior completo e regular
+  if (metrics.complete) {
+    return {
+      pending: false,
+      minutes: metrics.balance,
+      text: (metrics.balance >= 0 ? "+" : "") + minutesText(metrics.balance),
+    };
+  }
+
+  // Dia anterior com falta (sem marcações e com jornada prevista)
+  if (!metrics.hasPunches && metrics.expected > 0) {
+    const missingDebit = -metrics.expected;
+    return {
+      pending: false,
+      minutes: missingDebit,
+      text: "-" + minutesText(metrics.expected),
+    };
+  }
+
+  // Dia anterior com marcação incompleta (ex: registrou entrada mas esqueceu a saída)
+  return {
+    pending: true,
+    minutes: 0,
+    text: "—",
+  };
+};
+
+const lastDateOfMonth = (month) => {
+  const [year, monthNumber] = String(month || "")
+    .split("-")
+    .map(Number);
+  if (!year || !monthNumber || monthNumber < 1 || monthNumber > 12) {
+    return todayIso();
+  }
+  return todayIso(new Date(year, monthNumber, 0, 12));
+};
+
+const nextDateKey = (dateKey) => {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  return todayIso(date);
+};
+
+const hourBankMovementMinutes = (movement) => {
+  const rawMinutes = movement?.SaldoMinutos;
+  const explicitMinutes = Number(rawMinutes);
+  if (
+    rawMinutes !== "" &&
+    rawMinutes !== undefined &&
+    Number.isFinite(explicitMinutes)
+  ) {
+    return explicitMinutes;
+  }
+  const hours = Number(movement?.SaldoDia);
+  return Number.isFinite(hours) ? Math.round(hours * 60) : 0;
+};
+
+const accumulatedHourBalance = ({
+  employees = [],
+  records = [],
+  schedules = [],
+  timeOff = [],
+  justifications = [],
+  movements = [],
+  throughMonth = monthIso(),
+  employeeId = "",
+  currentDate = todayIso(),
+} = {}) => {
+  const month = /^\d{4}-\d{2}$/.test(String(throughMonth || ""))
+    ? String(throughMonth)
+    : monthIso();
+  const throughDate = [lastDateOfMonth(month), currentDate].sort()[0];
+  // O painel administrativo precisa representar o cadastro inteiro. A
+  // ausência de marcações significa saldo ainda não iniciado, não ausência do
+  // funcionário no relatório.
+  const allowed = employees.filter(
+    (item) =>
+      !employeeId || String(item.FuncionarioID) === String(employeeId),
+  );
+  const allowedIds = new Set(
+    allowed.map((item) => String(item.FuncionarioID || "")),
+  );
+  const validRecords = records.filter((item) => {
+    const date = normalizedDateKey(item.Data || item.DataHora);
+    return (
+      allowedIds.has(String(item.FuncionarioID || "")) &&
+      item.Status !== "Substituído" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+      date <= throughDate
+    );
+  });
+  const firstPunches = firstPunchDatesByEmployee(validRecords);
+  const recordsByEmployeeDate = new Map();
+  validRecords.forEach((item) => {
+    const date = normalizedDateKey(item.Data || item.DataHora);
+    const key = `${item.FuncionarioID}|${date}`;
+    const rows = recordsByEmployeeDate.get(key) || [];
+    rows.push(item);
+    recordsByEmployeeDate.set(key, rows);
+  });
+  const schedulesByEmployee = new Map();
+  schedules.forEach((item) => {
+    const id = String(item.FuncionarioID || "");
+    if (!allowedIds.has(id)) return;
+    const rows = schedulesByEmployee.get(id) || [];
+    rows.push(item);
+    schedulesByEmployee.set(id, rows);
+  });
+  const timeOffByEmployee = new Map();
+  timeOff.forEach((item) => {
+    const id = String(item.FuncionarioID || "");
+    if (!allowedIds.has(id)) return;
+    const rows = timeOffByEmployee.get(id) || [];
+    rows.push(item);
+    timeOffByEmployee.set(id, rows);
+  });
+  const justifiedDates = new Set(
+    justifications
+      .filter((item) => item.Status === "Aprovada")
+      .map(
+        (item) =>
+          `${item.FuncionarioID}|${normalizedDateKey(item.Data)}`,
+      ),
+  );
+  const movementTotals = new Map();
+  movements.forEach((item) => {
+    const id = String(item.FuncionarioID || "");
+    const date = normalizedDateKey(item.Data);
+    if (!allowedIds.has(id) || (date && date > throughDate)) return;
+    movementTotals.set(
+      id,
+      Number(movementTotals.get(id) || 0) + hourBankMovementMinutes(item),
+    );
+  });
+
+  const totals = [];
+  allowed.forEach((employee) => {
+    const id = String(employee.FuncionarioID || "");
+    const start = firstPunches.get(id);
+    const employeeSchedules = schedulesByEmployee.get(id) || [];
+    const employeeTimeOff = timeOffByEmployee.get(id) || [];
+    const adjustments = Number(movementTotals.get(id) || 0);
+    let balance = adjustments;
+    let worked = 0;
+    let expected = 0;
+    let pending = 0;
+    const cltLimitDate = new Date(
+      new Date(`${currentDate || throughDate}T12:00:00`).getTime() - 150 * 86400000,
+    )
+      .toISOString()
+      .slice(0, 10);
+    let olderPositiveMinutes = 0;
+    for (let date = start; date && date <= throughDate; date = nextDateKey(date)) {
+      const schedule = scheduleFor(employeeSchedules, id, date);
+      const rows = recordsByEmployeeDate.get(`${id}|${date}`) || [];
+      const approvedOff = employeeTimeOff.find(
+        (item) =>
+          ["Aprovada", "Concluída"].includes(item.Status) &&
+          normalizedDateKey(item.DataInicio) <= date &&
+          (item.DataFim
+            ? normalizedDateKey(item.DataFim)
+            : normalizedDateKey(item.DataInicio)) >= date,
+      );
+      const fixed =
+        !approvedOff && isFixedOffForDate(employee, date, employeeTimeOff);
+      const weekday = new Date(`${date}T12:00:00`).getDay();
+      const scheduledDay = isScheduledWorkday(
+        schedule,
+        employee,
+        weekday,
+      );
+      if (
+        !rows.length &&
+        !approvedOff &&
+        !fixed &&
+        !scheduledDay
+      ) {
+        continue;
+      }
+      if (
+        justifiedDates.has(`${id}|${date}`) ||
+        ((approvedOff || fixed) && !rows.length)
+      ) {
+        continue;
+      }
+      const metrics = dayMetrics(rows, schedule, {
+        expectedMinutes:
+          scheduledDay && !approvedOff && !fixed
+            ? scheduleExpectedMinutes(schedule)
+            : 0,
+        dateKey: date,
+      });
+      const state = dayBalanceState(date, metrics, currentDate);
+      if (state.pending) {
+        pending += 1;
+      } else {
+        worked += Number(metrics.worked || 0);
+        expected += Number(metrics.expected || 0);
+        balance += Number(state.minutes || 0);
+        if (date <= cltLimitDate && Number(state.minutes || 0) > 0) {
+          olderPositiveMinutes += Number(state.minutes || 0);
+        }
+      }
+    }
+    const saldoVencendoMinutos =
+      balance > 0 && olderPositiveMinutes > 0
+        ? Math.min(balance, olderPositiveMinutes)
+        : 0;
+    totals.push({
+      FuncionarioID: employee.FuncionarioID,
+      Nome: employee.Nome,
+      LojaID: employee.LojaID || "",
+      NomeLoja: employee.NomeLoja || "",
+      Ativo: asBoolean(employee.Ativo),
+      trabalhadoMinutos: worked,
+      trabalhadoTexto: minutesText(worked),
+      previstoMinutos: expected,
+      previstoTexto: minutesText(expected),
+      ajustesMinutos: adjustments,
+      ajustesTexto:
+        (adjustments >= 0 ? "+" : "") + minutesText(adjustments),
+      pendencias: pending,
+      saldoMinutos: balance,
+      saldoTexto: (balance >= 0 ? "+" : "") + minutesText(balance),
+      saldoVencendoMinutos,
+      saldoVencendoTexto:
+        saldoVencendoMinutos > 0 ? minutesText(saldoVencendoMinutos) : "",
+      prazoLegalAlerta: saldoVencendoMinutos > 0,
+      desde: start || "",
+      ate: throughDate,
+    });
+  });
+  const totalMinutos = totals
+    .filter((item) => item.Ativo !== false)
+    .reduce((sum, item) => sum + Number(item.saldoMinutos || 0), 0);
+  return {
+    month,
+    throughDate,
+    employees: totals,
+    totalMinutos,
+    totalTexto:
+      (totalMinutos >= 0 ? "+" : "") + minutesText(totalMinutos),
+  };
+};
+
+async function clockContext(filters = {}) {
+  const profile = await runtime.requireProfile();
+  const month = /^\d{4}-\d{2}$/.test(String(filters.month || ""))
+    ? String(filters.month)
+    : monthIso();
+  const recordPeriods = new Set([month]);
+  if (month === monthIso()) {
+    recordPeriods.add(previousDateKey(todayIso()).slice(0, 7));
+  }
+  const [employees, records, schedules, adjustments, timeOff, justifications, bankMovements] =
+    await Promise.all([
+      runtime.list("Funcionarios", { profile }),
+      runtime.listPeriods("RegistrosPonto", [...recordPeriods], { profile }),
+      runtime.list("JornadasPonto", { profile }),
+      runtime.list("AjustesPonto", { profile }),
+      runtime.list("Folgas", { profile }),
+      runtime.list("JustificativasPonto", { profile }),
+      runtime.list("BancoHorasMovimentos", { profile }),
+    ]);
+  const trackingRecords =
+    filters.includeHistoricalStart === true && isAdmin(profile)
+      ? await runtime.list("RegistrosPonto", { profile })
+      : records;
+  let allowed = employees.filter((item) => asBoolean(item.Ativo));
+  if (filters.funcionarioId) {
+    allowed = allowed.filter(
+      (item) => item.FuncionarioID === filters.funcionarioId,
+    );
+  }
+  const allowedIds = new Set(allowed.map((item) => item.FuncionarioID));
+  const monthRecords = records
+    .filter(
+      (item) =>
+        allowedIds.has(item.FuncionarioID) &&
+        normalizedDateKey(item.Data).slice(0, 7) === month &&
+        item.Status !== "Substituído",
+    )
+    .sort(compareRecordsByDateTime);
+  const monthAdjustments = adjustments.filter(
+    (item) =>
+      allowedIds.has(item.FuncionarioID) &&
+      (normalizedDateKey(item.Data).slice(0, 7) === month ||
+        item.Status === "Pendente"),
+  );
+  const normProfileEmpId = String(profile.FuncionarioID ?? "").trim();
+  const ownEmployee = allowed.find(
+    (item) => String(item.FuncionarioID ?? "").trim() === normProfileEmpId,
+  );
+  const operationalDay = ownEmployee
+    ? operationalDayFor(
+        records,
+        schedules,
+        ownEmployee.FuncionarioID,
+      )
+    : todayIso();
+  const ownSchedule = ownEmployee
+    ? (scheduleFor(schedules, ownEmployee.FuncionarioID, operationalDay) ||
+       defaultScheduleFor(ownEmployee.FuncionarioID, ownEmployee.LojaID, ownEmployee.Email))
+    : null;
+  const todayRecords = ownEmployee
+    ? records
+        .filter(
+          (item) =>
+            String(item.FuncionarioID ?? "").trim() === String(ownEmployee.FuncionarioID ?? "").trim() &&
+            normalizedDateKey(item.Data) === operationalDay &&
+            item.Status !== "Substituído",
+        )
+        .sort(compareRecordsByDateTime)
+    : [];
+  const todayTimeOff = ownEmployee
+    ? timeOff.find(
+        (item) =>
+          item.FuncionarioID === ownEmployee.FuncionarioID &&
+          ["Aprovada", "Concluída"].includes(item.Status) &&
+          normalizedDateKey(item.DataInicio) <= operationalDay &&
+          (item.DataFim
+            ? normalizedDateKey(item.DataFim)
+            : normalizedDateKey(item.DataInicio)) >= operationalDay,
+      )
+    : null;
+  const fixedOff =
+    !!ownEmployee &&
+    !todayTimeOff &&
+    isFixedOffForDate(ownEmployee, operationalDay, timeOff);
+
+  const days = [];
+  const [year, monthNumber] = month.split("-").map(Number);
+  const monthDays = new Date(year, monthNumber, 0).getDate();
+  const trackingStartByEmployee =
+    firstPunchDatesByEmployee(trackingRecords);
+  for (const employee of allowed) {
+    for (let day = 1; day <= monthDays; day += 1) {
+      const dateKey = `${month}-${String(day).padStart(2, "0")}`;
+      if (dateKey > todayIso()) continue;
+      const trackingStart = trackingStartByEmployee.get(
+        employee.FuncionarioID,
+      );
+      const hasJustification = justifications.some(
+        (item) =>
+          item.FuncionarioID === employee.FuncionarioID &&
+          normalizedDateKey(item.Data) === dateKey &&
+          item.Status === "Aprovada",
+      );
+      if ((!trackingStart || dateKey < trackingStart) && !hasJustification) continue;
+      const schedule = scheduleFor(schedules, employee.FuncionarioID, dateKey);
+      const rows = monthRecords.filter(
+        (item) =>
+          item.FuncionarioID === employee.FuncionarioID &&
+          normalizedDateKey(item.Data) === dateKey,
+      );
+      const approvedOff = timeOff.find(
+        (item) =>
+          item.FuncionarioID === employee.FuncionarioID &&
+          ["Aprovada", "Concluída"].includes(item.Status) &&
+          normalizedDateKey(item.DataInicio) <= dateKey &&
+          (item.DataFim
+            ? normalizedDateKey(item.DataFim)
+            : normalizedDateKey(item.DataInicio)) >= dateKey,
+      );
+      const weekday = new Date(`${dateKey}T12:00:00`).getDay();
+      const fixed =
+        !approvedOff && isFixedOffForDate(employee, dateKey, timeOff);
+      const scheduledDay = isScheduledWorkday(
+        schedule,
+        employee,
+        weekday,
+      );
+      if (
+        !rows.length &&
+        !approvedOff &&
+        !fixed &&
+        !scheduledDay
+      ) {
+        continue;
+      }
+      const metrics = dayMetrics(rows, schedule, {
+        expectedMinutes:
+          scheduledDay && !approvedOff && !fixed
+            ? scheduleExpectedMinutes(schedule)
+            : 0,
+        dateKey,
+      });
+      const justification = justifications.find(
+        (item) =>
+          item.FuncionarioID === employee.FuncionarioID &&
+          normalizedDateKey(item.Data) === dateKey &&
+          item.Status === "Aprovada",
+      );
+      const balanceState = justification
+        ? { minutes: 0, text: "Justificado", pending: false }
+        : dayBalanceState(dateKey, metrics);
+      days.push({
+        funcionarioId: employee.FuncionarioID,
+        nome: employee.Nome,
+        data: dateKey,
+        entrada: metrics.entrada,
+        saidaIntervalo: metrics.saidaIntervalo,
+        retornoIntervalo: metrics.retornoIntervalo,
+        saida: metrics.saida,
+        horaSaidaPrevista: calculateSuggestedExit(
+          schedule,
+          metrics.entrada || rows[0]?.DataHora,
+        ),
+        trabalhadoMinutos: metrics.worked,
+        trabalhadoTexto: minutesText(metrics.worked),
+        previstoMinutos: metrics.expected,
+        previstoTexto: minutesText(metrics.expected),
+        saldoMinutos: balanceState.minutes,
+        saldoTexto: balanceState.text,
+        saldoPendente: balanceState.pending,
+        revisaoObrigatoria: metrics.reviewRequired,
+        folga: !!approvedOff,
+        folgaFixa: fixed,
+        trabalhou: rows.length > 0,
+        justificado: !!justification,
+        justificativaId: justification?.JustificativaPontoID || "",
+        justificativaTipo: justification?.Tipo || "",
+        justificativaObservacao: justification?.Observacao || "",
+      });
+    }
+  }
+  const validDays = balanceDays(days);
+  const totals = validDays.reduce(
+    (result, item) => {
+      result.worked += Number(item.trabalhadoMinutos || 0);
+      result.expected += Number(item.previstoMinutos || 0);
+      result.balance += Number(item.saldoMinutos || 0);
+      return result;
+    },
+    { worked: 0, expected: 0, balance: 0 },
+  );
+  const monthBankMovements = bankMovements.filter(
+    (item) =>
+      allowedIds.has(String(item.FuncionarioID || "")) &&
+      normalizedDateKey(item.Data).slice(0, 7) === month,
+  );
+  const movementsBalance = monthBankMovements.reduce(
+    (sum, item) => sum + hourBankMovementMinutes(item),
+    0,
+  );
+  const finalBalanceMinutes = totals.balance + movementsBalance;
+  return {
+    month,
+    date: operationalDay,
+    employees: allowed,
+    records: monthRecords,
+    schedules: schedules.filter((item) =>
+      allowedIds.has(item.FuncionarioID),
+    ),
+    locations: [],
+    adjustments: monthAdjustments,
+    bankMovements: monthBankMovements,
+    justifications: justifications.filter(
+      (item) =>
+        allowedIds.has(item.FuncionarioID) &&
+        normalizedDateKey(item.Data).slice(0, 7) === month,
+    ),
+    days,
+    todayRecords,
+    nextAction:
+      ownEmployee && !todayTimeOff && !fixedOff
+        ? nextClockAction(todayRecords, ownSchedule)
+        : "",
+    breakDurationMinutes: Number(ownSchedule?.DuracaoIntervaloMinutos || 0),
+    flexibleTwoShifts: asBoolean(ownSchedule?.HorarioFlexivelDoisTurnos),
+    offToday: !!todayTimeOff || fixedOff,
+    offTodayLabel: todayTimeOff
+      ? "De folga hoje"
+      : fixedOff
+        ? "Folga fixa hoje"
+        : "",
+    summary: {
+      trabalhadoMinutos: totals.worked,
+      previstoMinutos: totals.expected,
+      saldoMinutos: finalBalanceMinutes,
+      trabalhadoTexto: minutesText(totals.worked),
+      previstoTexto: minutesText(totals.expected),
+      saldoTexto:
+        (finalBalanceMinutes >= 0 ? "+" : "") +
+        minutesText(finalBalanceMinutes),
+    },
+  };
+}
+
+async function quickClockContext() {
+  const profile = await runtime.requireProfile();
+  const employee = await runtime.getById(
+    "Funcionarios",
+    profile.FuncionarioID,
+  );
+  if (!employee || !asBoolean(employee.Ativo)) {
+    return {
+      month: monthIso(),
+      date: todayIso(),
+      todayRecords: [],
+      records: [],
+      days: [],
+      adjustments: [],
+      nextAction: "",
+      offToday: false,
+      offTodayLabel: "",
+      breakDurationMinutes: 0,
+      flexibleTwoShifts: false,
+      summary: {},
+    };
+  }
+  const [records, schedules, timeOff] = await Promise.all([
+    runtime.listPeriods(
+      "RegistrosPonto",
+      [monthIso(), previousDateKey(todayIso()).slice(0, 7)],
+      { profile },
+    ),
+    runtime.list("JornadasPonto", { profile }),
+    runtime.list("Folgas", { profile }),
+  ]);
+  const empId = String(employee.FuncionarioID ?? "").trim();
+  const operationalDay = operationalDayFor(
+    records,
+    schedules,
+    empId,
+  );
+  const foundSchedule = scheduleFor(
+    schedules,
+    empId,
+    operationalDay,
+  );
+  const schedule =
+    foundSchedule && asBoolean(foundSchedule.Ativa)
+      ? foundSchedule
+      : defaultScheduleFor(empId, employee.LojaID, employee.Email);
+  const todayRecords = records
+    .filter(
+      (item) =>
+        String(item.FuncionarioID ?? "").trim() === empId &&
+        normalizedDateKey(item.Data) === operationalDay &&
+        item.Status !== "Substituído",
+    )
+    .sort(compareRecordsByDateTime);
+  const approvedOff = timeOff.find(
+    (item) =>
+      String(item.FuncionarioID ?? "").trim() === empId &&
+      ["Aprovada", "Concluída"].includes(item.Status) &&
+      normalizedDateKey(item.DataInicio) <= operationalDay &&
+      (item.DataFim
+        ? normalizedDateKey(item.DataFim)
+        : normalizedDateKey(item.DataInicio)) >= operationalDay,
+  );
+  const fixedOff =
+    !approvedOff &&
+    isFixedOffForDate(employee, operationalDay, timeOff);
+  const operationalWeekday = new Date(`${operationalDay}T12:00:00`).getDay();
+  const scheduledDay = isScheduledWorkday(
+    schedule,
+    employee,
+    operationalWeekday,
+  );
+  const metrics = dayMetrics(todayRecords, schedule, {
+    expectedMinutes:
+      scheduledDay && !approvedOff && !fixedOff
+        ? scheduleExpectedMinutes(schedule)
+        : 0,
+    dateKey: operationalDay,
+  });
+  return {
+    month: operationalDay.slice(0, 7),
+    date: operationalDay,
+    todayRecords,
+    records: todayRecords,
+    days: [],
+    adjustments: [],
+    nextAction:
+      !approvedOff && !fixedOff
+        ? nextClockAction(todayRecords, schedule)
+        : "",
+    breakDurationMinutes: Number(schedule?.DuracaoIntervaloMinutos || 0),
+    flexibleTwoShifts: asBoolean(schedule?.HorarioFlexivelDoisTurnos),
+    offToday: !!approvedOff || fixedOff,
+    offTodayLabel: approvedOff
+      ? "De folga hoje"
+      : fixedOff
+        ? "Folga fixa hoje"
+        : "",
+    summary: {
+      trabalhadoMinutos: metrics.worked,
+      previstoMinutos: metrics.expected,
+      saldoMinutos: metrics.balance,
+      trabalhadoTexto: minutesText(metrics.worked),
+      previstoTexto: minutesText(metrics.expected),
+      saldoTexto:
+        (metrics.balance >= 0 ? "+" : "") + minutesText(metrics.balance),
+    },
+  };
+}
+
+export function createClockHandlers() {
+  return {
+    async getTimeClockSettingsWithSession(args) {
+      dropClientToken(args);
+      const profile = await runtime.requireProfile();
+      const [schedules, locations] = await Promise.all([
+        runtime.list("JornadasPonto", { profile }),
+        runtime.list("LocaisPonto", { profile }),
+      ]);
+      return success({ schedules, locations }, "Configurações carregadas.");
+    },
+
+    async saveTimeClockEmployeeConfig(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employee = await runtime.getById(
+        "Funcionarios",
+        payload.funcionarioId || payload.FuncionarioID,
+      );
+      assert(employee, "Funcionário não encontrado.");
+      scopeRecord(profile, employee);
+      const employeeSchedules = (
+        await runtime.list("JornadasPonto", { profile })
+      ).filter(
+        (item) => item.FuncionarioID === employee.FuncionarioID,
+      );
+      const existing =
+        scheduleFor(
+          employeeSchedules,
+          employee.FuncionarioID,
+          todayIso(),
+        ) ||
+        employeeSchedules.sort((a, b) =>
+          String(b.DataAtualizacao || b.VigenteDe || "").localeCompare(
+            String(a.DataAtualizacao || a.VigenteDe || ""),
+          ),
+        )[0];
+      const schedule = await runtime.upsert("JornadasPonto", {
+        ...(existing || {}),
+        JornadaPontoID: existing?.JornadaPontoID || uuid(),
+        FuncionarioID: employee.FuncionarioID,
+        EmailFuncionario: payload.email || employee.Email,
+        LojaID: employee.LojaID,
+        TipoJornada: payload.tipoJornada || "Completa",
+        HorarioFlexivelDoisTurnos:
+          payload.horarioFlexivelDoisTurnos === true,
+        CargaDiariaMinutos: Number(payload.cargaDiariaMinutos || 0),
+        CargaSemanalMinutos: Number(payload.cargaSemanalMinutos || 0),
+        HoraEntrada: payload.horaEntrada || "",
+        HoraSaidaIntervalo: payload.horaSaidaIntervalo || "",
+        HoraRetornoIntervalo: payload.horaRetornoIntervalo || "",
+        HoraSaida: payload.horaSaida || "",
+        DuracaoIntervaloMinutos: Number(payload.duracaoIntervaloMinutos || 0),
+        DiasTrabalho: payload.diasTrabalho || "1,2,3,4,5,6",
+        ToleranciaMinutos: Number(payload.toleranciaMinutos || 0),
+        BancoHorasAtivo: payload.bancoHorasAtivo !== false,
+        Ativa: true,
+        DataAtualizacao: nowIso(),
+        AtualizadoPor: profile.Email,
+        VigenteDe: existing?.VigenteDe || todayIso(),
+        VigenteAte: "",
+      });
+      await audit(
+        "Configurar jornada",
+        "Ponto",
+        schedule.JornadaPontoID,
+        { after: schedule },
+      );
+      return success(schedule, "Jornada guardada.");
+    },
+
+    async saveTimeClockStoreLocation(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const store = await runtime.getById(
+        "Lojas",
+        payload.lojaId || payload.LojaID,
+      );
+      assert(store, "Loja não encontrada.");
+      scopeRecord(profile, store);
+      const latitude = Number(payload.latitude);
+      const longitude = Number(payload.longitude);
+      assert(
+        Number.isFinite(latitude) &&
+          Number.isFinite(longitude) &&
+          Math.abs(latitude) <= 90 &&
+          Math.abs(longitude) <= 180,
+        "Informe latitude e longitude válidas.",
+      );
+      const existing = await runtime.findOne(
+        "LocaisPonto",
+        "LojaID",
+        store.LojaID,
+      );
+      const location = await runtime.upsert("LocaisPonto", {
+        ...(existing || {}),
+        LocalPontoID: existing?.LocalPontoID || uuid(),
+        LojaID: store.LojaID,
+        NomeLoja: store.NomeLoja,
+        Latitude: latitude,
+        Longitude: longitude,
+        RaioMetros: Math.max(20, Number(payload.raioMetros || 150)),
+        Ativo: true,
+        DataAtualizacao: nowIso(),
+        AtualizadoPor: profile.Email,
+      });
+      return success(location, "Local do ponto guardado.");
+    },
+
+    async getTimeClockDataWithSession(args) {
+      const values = dropClientToken(args);
+      return success(await clockContext(values[0] || {}), "Ponto carregado.");
+    },
+
+    async getTimeClockQuickStatusWithSession(args) {
+      dropClientToken(args);
+      return success(await quickClockContext(), "Ponto pronto.");
+    },
+
+    async prepareTimeClockSelfieUpload(args) {
+      dropClientToken(args);
+      await warmSelfieDriveService();
+      return success({ ready: true }, "Serviço de selfie preparado.");
+    },
+
+    async registerTimeClockPunch(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employeeId = String(profile.FuncionarioID || "");
+      const storeId = String(profile.LojaID || "");
+      assert(employeeId, "Usuário sem funcionário vinculado.");
+      assert(storeId, "Usuário sem loja vinculada.");
+      const [employee, location, schedules, allRecords] = await Promise.all([
+        runtime.getById("Funcionarios", employeeId),
+        runtime.findOne("LocaisPonto", "LojaID", storeId),
+        runtime.list("JornadasPonto", { profile }),
+        runtime.listPeriods(
+          "RegistrosPonto",
+          [monthIso(), previousDateKey(todayIso()).slice(0, 7)],
+          { profile },
+        ),
+      ]);
+      assert(employee && asBoolean(employee.Ativo), "Funcionário inativo.");
+      assert(
+        String(employee.LojaID || "") === storeId,
+        "O funcionário está vinculado a outra loja. Atualize o acesso.",
+      );
+      assert(location && asBoolean(location.Ativo), "Configure o local do ponto.");
+      const empId = String(employee.FuncionarioID ?? "").trim();
+      const day = operationalDayFor(
+        allRecords,
+        schedules,
+        empId,
+      );
+      const foundSchedule = scheduleFor(
+        schedules,
+        empId,
+        day,
+      );
+      const schedule =
+        foundSchedule && asBoolean(foundSchedule.Ativa)
+          ? foundSchedule
+          : defaultScheduleFor(empId, employee.LojaID, employee.Email);
+      const latitude = Number(payload.latitude);
+      const longitude = Number(payload.longitude);
+      const accuracy = Number(payload.accuracy);
+      assert(
+        Number.isFinite(latitude) &&
+          Number.isFinite(longitude) &&
+          Number.isFinite(accuracy),
+        "Autorize a localização precisa para bater o ponto.",
+      );
+      const distance = Math.round(
+        haversineMeters(
+          latitude,
+          longitude,
+          Number(location.Latitude),
+          Number(location.Longitude),
+        ),
+      );
+      const configuredRadius = Number(location.RaioMetros || 150);
+      const radius = Math.max(150, configuredRadius);
+      const safeAccuracy = Math.ceil(Math.max(0, accuracy));
+
+      assert(
+        safeAccuracy <= 350,
+        `Sinal de localização muito impreciso (±${safeAccuracy} m). Ative o Wi-Fi ou aproxime-se de uma área aberta para calibrar o GPS.`,
+      );
+
+      // Validação justa e robusta de geofence:
+      // 1. Se a distância calculada está dentro do raio (distance <= radius), o funcionário está fisicamente no local.
+      // 2. Se a distância estimada estiver ligeiramente fora devido a drift em ambiente fechado,
+      //    concede tolerância segura se o círculo de incerteza alcançar a loja.
+      const withinStore =
+        distance <= radius ||
+        (distance - Math.min(safeAccuracy * 0.6, 90) <= radius && safeAccuracy <= 350);
+
+      assert(
+        withinStore,
+        `Você está a ${distance} m da loja (precisão ±${safeAccuracy} m), fora do raio de ${radius} m.`,
+      );
+      const records = allRecords.filter(
+        (item) =>
+          String(item.FuncionarioID ?? "").trim() === empId &&
+          normalizedDateKey(item.Data) === day &&
+          item.Status !== "Substituído",
+      );
+      const requestId = String(payload.requestId || "").trim();
+      assert(requestId, "Atualize a tela e tente registrar o ponto novamente.");
+      const repeated = requestId
+        ? records.find((item) => item.RequestID === requestId)
+        : null;
+      if (repeated) {
+        return success(
+          {
+            ...repeated,
+            ProximaMarcacao: nextClockAction(records, schedule),
+          },
+          `Ponto já registrado: ${repeated.TipoMarcacao}.`,
+        );
+      }
+      const next = nextClockAction(records, schedule);
+      const expected = String(payload.expectedAction || next).toUpperCase();
+
+      // Idempotência inteligente: se a ação esperada já foi gravada hoje (ex: duplo toque ou retry após timeout):
+      const alreadyDoneExpected = records.find(
+        (item) => item.TipoMarcacao === expected && item.Status !== "Substituído",
+      );
+      if (alreadyDoneExpected && expected !== next) {
+        return success(
+          {
+            ...alreadyDoneExpected,
+            ProximaMarcacao: next,
+          },
+          `Ponto já registrado: ${alreadyDoneExpected.TipoMarcacao}.`,
+        );
+      }
+
+      let type = next;
+      if (expected === "SEM_DESCANSO" && next === "SAIDA_INTERVALO") {
+        type = "SEM_DESCANSO";
+      } else if (expected === next) {
+        type = next;
+      } else if (next && sequenceFor(schedule).includes(next)) {
+        // Se a tela enviou ação defasada mas a próxima marcação necessária é válida, registra o próximo passo da jornada com segurança:
+        type = next;
+      } else {
+        assert(expected === next, "A tela estava desatualizada. Atualize o ponto.");
+      }
+      assert(type, "A jornada de hoje já foi concluída.");
+      let selfie;
+      try {
+        selfie = await uploadClockSelfieToDrive({
+          selfieDataUrl: payload.selfieDataUrl,
+          requestId,
+          day,
+          type,
+        });
+      } catch (selfieErr) {
+        console.warn(
+          "[ponto] Falha no upload ao Drive; aplicando contingência segura (CLT/Portaria 671):",
+          selfieErr?.message || selfieErr,
+        );
+        selfie = {
+          fileId: "contingencia_" + requestId,
+          fileUrl: "",
+          fileName: `${day}__${requestId}.jpg`,
+          uploadedAt: nowIso(),
+          offlineFallback: true,
+        };
+      }
+      const punchTimestamp = nowIso();
+      const punchHash = await sha256Hex(
+        `${requestId}|${employee.FuncionarioID}|${employee.LojaID}|${punchTimestamp}|${type}|${latitude.toFixed(6)}|${longitude.toFixed(6)}`,
+      );
+      const record = {
+        RegistroPontoID: requestId,
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        EmailFuncionario: employee.Email,
+        LojaID: employee.LojaID,
+        NomeLoja: employee.NomeLoja,
+        Data: day,
+        TipoMarcacao: type,
+        DataHora: punchTimestamp,
+        Latitude: latitude,
+        Longitude: longitude,
+        PrecisaoMetros: accuracy,
+        DistanciaLojaMetros: distance,
+        DentroRaio: true,
+        Origem: "Aplicação web · selfie no Google Drive + localização",
+        SelfieStorage: "Google Drive",
+        SelfieDriveFileID: selfie.fileId,
+        SelfieDriveURL: selfie.fileUrl,
+        SelfieDriveFileName: selfie.fileName,
+        SelfieDriveUploadedAt: selfie.uploadedAt,
+        ComprovanteHashSHA256: punchHash,
+        NumeroRegistro: requestId,
+        Portaria671Valido: true,
+        Status: "Válido",
+        Observacoes:
+          type === "SEM_DESCANSO"
+            ? "Descanso não realizado; período mantido como trabalhado."
+            : "",
+        Ajustado: false,
+        RegistroOriginalID: "",
+        DataCriacao: punchTimestamp,
+        ForaHorario: false,
+        CriadoPor: profile.Email,
+        RequestID: requestId,
+      };
+      let saved;
+      try {
+        saved = await runtime.create("RegistrosPonto", record);
+        runtime.invalidateTableCache?.("RegistrosPonto");
+      } catch (error) {
+        const existing = await runtime.getById("RegistrosPonto", requestId);
+        if (existing?.RequestID !== requestId) throw error;
+        saved = existing;
+      }
+      void audit("Registrar ponto", "Ponto", saved.RegistroPontoID, {
+        after: saved,
+      }).catch((error) =>
+        console.warn("Auditoria do ponto:", error?.message || error),
+      );
+      return success(
+        {
+          ...saved,
+          ProximaMarcacao: nextClockAction([...records, saved], schedule),
+        },
+        `Ponto registrado: ${type}.`,
+      );
+    },
+
+    async registerTimeClockManualPunch(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employee = await runtime.getById(
+        "Funcionarios",
+        payload.funcionarioId,
+      );
+      assert(employee, "Funcionário não encontrado.");
+      assert(clockTypes.includes(payload.tipoMarcacao), "Tipo inválido.");
+      assert(String(payload.motivo || "").trim(), "Informe o motivo.");
+      const dateTime = new Date(payload.dataHora);
+      assert(
+        Number.isFinite(dateTime.getTime()) &&
+          dateTime.getTime() <= Date.now() + 5 * 60000,
+        "Informe um horário válido e não futuro.",
+      );
+      const saved = await runtime.upsert("RegistrosPonto", {
+        RegistroPontoID: uuid(),
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        EmailFuncionario: employee.Email,
+        LojaID: employee.LojaID,
+        NomeLoja: employee.NomeLoja,
+        Data: payload.dataOperacional || todayIso(dateTime),
+        TipoMarcacao: payload.tipoMarcacao,
+        DataHora: dateTime.toISOString(),
+        Latitude: "",
+        Longitude: "",
+        PrecisaoMetros: "",
+        DistanciaLojaMetros: "",
+        DentroRaio: true,
+        Origem: "Lançamento administrativo",
+        Status: "Válido",
+        Observacoes: payload.motivo,
+        Ajustado: true,
+        RegistroOriginalID: "",
+        DataCriacao: nowIso(),
+        ForaHorario: false,
+        CriadoPor: profile.Email,
+      });
+      await audit(
+        "Lançar ponto manual",
+        "Ponto",
+        saved.RegistroPontoID,
+        { after: saved },
+      );
+      return success(saved, "Ponto lançado com auditoria.");
+    },
+
+    async requestTimeClockAdjustment(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const record = await runtime.getById(
+        "RegistrosPonto",
+        payload.registroPontoId,
+      );
+      assert(record, "Registro de ponto não encontrado.");
+      scopeRecord(profile, record);
+      const requestedDate = new Date(payload.dataHoraSolicitada);
+      const reason = String(payload.motivo || "").trim();
+      assert(
+        Number.isFinite(requestedDate.getTime()),
+        "Informe a data e hora solicitadas.",
+      );
+      assert(reason, "Informe o motivo do ajuste.");
+      const adjustment = await runtime.upsert("AjustesPonto", {
+        AjustePontoID: uuid(),
+        RegistroPontoID: record.RegistroPontoID,
+        FuncionarioID: record.FuncionarioID,
+        NomeFuncionario: record.NomeFuncionario,
+        LojaID: record.LojaID,
+        Data: record.Data,
+        TipoMarcacao: record.TipoMarcacao,
+        DataHoraOriginal: record.DataHora,
+        DataHoraSolicitada: requestedDate.toISOString(),
+        Motivo: reason,
+        Status: "Pendente",
+        SolicitadoPor: profile.Email,
+        DataSolicitacao: nowIso(),
+        DecididoPor: "",
+        DataDecisao: "",
+        ObservacaoDecisao: "",
+        DataHoraAprovada: "",
+      });
+      createNotification({
+        storeId: record.LojaID,
+        subject: "Solicitação de ajuste de ponto",
+        message: `${record.NomeFuncionario || "Colaborador"} solicitou ajuste no ponto de ${record.Data} (${record.TipoMarcacao}). Acesse para avaliar.`,
+        type: "Ponto",
+        relatedId: adjustment.AjustePontoID,
+        severity: "info",
+      }).catch(() => {});
+      return success(adjustment, "Pedido de ajuste enviado.");
+    },
+
+    async decideTimeClockAdjustment(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const adjustment = await runtime.getById(
+        "AjustesPonto",
+        payload.ajustePontoId,
+      );
+      assert(adjustment, "Pedido de ajuste não encontrado.");
+      scopeRecord(profile, adjustment);
+      assert(
+        adjustment.Status === "Pendente",
+        "Este pedido de ajuste já recebeu uma decisão.",
+      );
+      const approved =
+        String(payload.decision || "").toLowerCase() === "aprovar";
+      const approvedDate = approved
+        ? new Date(payload.dataHoraAprovada || adjustment.DataHoraSolicitada)
+        : null;
+      if (approved) {
+        assert(
+          Number.isFinite(approvedDate.getTime()),
+          "Informe uma data e hora válidas para a aprovação.",
+        );
+      }
+      const decisionChanges = {
+        Status: approved ? "Aprovado" : "Rejeitado",
+        DecididoPor: profile.Email,
+        DataDecisao: nowIso(),
+        ObservacaoDecisao: String(payload.observacao || ""),
+        DataHoraAprovada: approved ? approvedDate.toISOString() : "",
+      };
+      let updated;
+      if (approved) {
+        [updated] = await runtime.patchMany([
+          {
+            table: "AjustesPonto",
+            id: adjustment.AjustePontoID,
+            changes: decisionChanges,
+          },
+          {
+            table: "RegistrosPonto",
+            id: adjustment.RegistroPontoID,
+            changes: {
+              DataHora: decisionChanges.DataHoraAprovada,
+              Data: todayIso(new Date(decisionChanges.DataHoraAprovada)),
+              Ajustado: true,
+              Observacoes: `Ajustado por ${profile.Email}: ${
+                payload.observacao || ""
+              }`,
+            },
+          },
+        ]);
+      } else {
+        updated = await runtime.patch(
+          "AjustesPonto",
+          adjustment.AjustePontoID,
+          decisionChanges,
+        );
+      }
+      await audit(
+        approved ? "Aprovar ajuste de ponto" : "Rejeitar ajuste de ponto",
+        "Ponto",
+        adjustment.AjustePontoID,
+        { before: adjustment, after: updated },
+      );
+      createNotification({
+        employeeId: adjustment.FuncionarioID,
+        storeId: adjustment.LojaID,
+        subject: approved ? "Ajuste de ponto aprovado" : "Ajuste de ponto rejeitado",
+        message: approved
+          ? `Seu ajuste de ponto para ${adjustment.Data} (${adjustment.TipoMarcacao}) foi aprovado!`
+          : `Seu ajuste de ponto para ${adjustment.Data} foi rejeitado.${payload.observacao ? " Motivo: " + payload.observacao : ""}`,
+        type: "Ponto",
+        relatedId: adjustment.AjustePontoID,
+        severity: approved ? "success" : "warning",
+      }).catch(() => {});
+      return success(
+        { ...updated, message: approved ? "Ajuste aprovado." : "Pedido rejeitado." },
+        approved ? "Ajuste aprovado." : "Pedido rejeitado.",
+      );
+    },
+
+    async justifyMissedTimeClockDay(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employee = await runtime.getById(
+        "Funcionarios",
+        payload.funcionarioId,
+      );
+      assert(employee && asBoolean(employee.Ativo), "Funcionário não encontrado.");
+      scopeRecord(profile, employee);
+      const date = normalizedDateKey(payload.data);
+      assert(/^\d{4}-\d{2}-\d{2}$/.test(date), "Informe uma data válida.");
+      assert(date <= todayIso(), "Não é possível justificar uma data futura.");
+      const type = String(payload.tipo || "").trim();
+      assert(clockJustificationTypes.includes(type), "Tipo de justificativa inválido.");
+      const observation = String(payload.observacao || "").trim();
+      if (type === "Outros") {
+        assert(observation.length >= 5, "Descreva o motivo em Outros.");
+      }
+      const records = await runtime.listPeriods(
+        "RegistrosPonto",
+        [date.slice(0, 7)],
+        { profile },
+      );
+      assert(
+        !records.some(
+          (item) =>
+            item.FuncionarioID === employee.FuncionarioID &&
+            normalizedDateKey(item.Data) === date &&
+            item.Status !== "Substituído",
+        ),
+        "Este dia possui marcações. Use o ajuste de ponto.",
+      );
+      const id = `${employee.FuncionarioID}__${date}`;
+      const existing = await runtime.getById("JustificativasPonto", id);
+      if (existing) scopeRecord(profile, existing);
+      const saved = await runtime.upsert("JustificativasPonto", {
+        ...(existing || {}),
+        JustificativaPontoID: id,
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        LojaID: employee.LojaID,
+        NomeLoja: employee.NomeLoja,
+        Data: date,
+        Tipo: type,
+        Observacao: observation,
+        Status: "Aprovada",
+        DataCriacao: existing?.DataCriacao || nowIso(),
+        DataAtualizacao: nowIso(),
+        JustificadoPor: profile.Email,
+      });
+      await audit(
+        existing ? "Atualizar justificativa de ponto" : "Justificar ausência de ponto",
+        "Ponto",
+        saved.JustificativaPontoID,
+        { before: existing || null, after: saved },
+      );
+      return success(saved, "Dia justificado sem gerar saldo negativo.");
+    },
+
+    async generateMonthlyTimeClockSheet(args) {
+      const values = dropClientToken(args);
+      const filters = values[0] || {};
+      const context = await clockContext(filters);
+      const rows = context.days.map((item) => ({
+        Funcionário: item.nome,
+        Data: item.data,
+        Entrada: item.entrada,
+        "Saída intervalo": item.saidaIntervalo,
+        "Retorno intervalo": item.retornoIntervalo,
+        Saída: item.saida,
+        Trabalhado: item.trabalhadoTexto,
+        Saldo: item.saldoTexto,
+        Justificativa: item.justificado
+          ? `${item.justificativaTipo}${item.justificativaObservacao ? ` — ${item.justificativaObservacao}` : ""}`
+          : "",
+      }));
+      const columns = Object.keys(rows[0] || { Funcionário: "", Data: "" });
+      return success({
+        sheetName: `Espelho-${context.month}`,
+        url: csvDataUrl(rows, columns),
+      });
+    },
+
+    async getMonthlyTimeClockMirrorData(args) {
+      const values = dropClientToken(args);
+      const filters = values[0] || {};
+      const profile = await runtime.requireProfile();
+      const isCollab = !isAdmin(profile) && !isManager(profile);
+      const targetEmpId = isCollab
+        ? profile.FuncionarioID
+        : (filters.funcionarioId || profile.FuncionarioID);
+
+      const context = await clockContext({
+        ...filters,
+        funcionarioId: targetEmpId,
+      });
+
+      const [employees, stores, records, schedules, timeOff, justifications, movements] =
+        await Promise.all([
+          runtime.list("Funcionarios", { profile }),
+          runtime.list("Lojas", { profile }),
+          runtime.list("RegistrosPonto", { profile }),
+          runtime.list("JornadasPonto", { profile }),
+          runtime.list("Folgas", { profile }),
+          runtime.list("JustificativasPonto", { profile }),
+          runtime.list("BancoHorasMovimentos", { profile }),
+        ]);
+
+      const employee =
+        employees.find((e) => String(e.FuncionarioID) === String(targetEmpId)) || {};
+      const store =
+        stores.find(
+          (s) => String(s.LojaID) === String(employee.LojaID || profile.LojaID),
+        ) || {};
+
+      const accumResult = accumulatedHourBalance({
+        employees: employee.FuncionarioID ? [employee] : employees,
+        records,
+        schedules,
+        timeOff,
+        justifications,
+        movements,
+        throughMonth: context.month,
+        employeeId: String(targetEmpId),
+      });
+
+      const empAccum = accumResult.employees.find(
+        (e) => String(e.FuncionarioID) === String(targetEmpId),
+      );
+      const saldoAcumuladoTexto = empAccum
+        ? empAccum.saldoTexto
+        : (context.summary?.saldoTexto || "0h 00min");
+      const saldoAcumuladoMinutos = empAccum
+        ? empAccum.saldoMinutos
+        : (context.summary?.saldoMinutos || 0);
+
+      let signatureInfo = {
+        isSigned: false,
+        status: "Pendente",
+        dataAssinatura: "",
+        codigoValidacao: "",
+        hashDocumentoFinalSHA256: "",
+        ultimoMotivoContestacao: "",
+      };
+      try {
+        const docId = `ESPELHO_${context.month}_${targetEmpId}`;
+        let existingDoc = await runtime.getById("Documentos", docId);
+
+        const hasWorkedDays = (context.days || []).some(
+          (item) => item.trabalhou || item.entrada || item.saida,
+        );
+        if (!existingDoc && hasWorkedDays) {
+          const [y, mNum] = context.month.split("-");
+          const mNames = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+          ];
+          const mLabel = `${mNames[Number(mNum) - 1] || mNum} de ${y}`;
+          const newDoc = {
+            DocID: docId,
+            DocumentoID: docId,
+            Titulo: `Espelho de Ponto — ${mLabel}`,
+            Tipo: "Espelho de Ponto",
+            Descricao: `Espelho de ponto mensal referente a ${mLabel} disponível para conferência e assinatura eletrônica (Portaria 671 MTE).`,
+            FuncionarioID: targetEmpId,
+            NomeFuncionario: employee.Nome || profile.Nome || "Colaborador",
+            CPFFuncionario: employee.CPF || "",
+            CargoFuncionario: employee.Cargo || profile.Cargo || "",
+            LojaID: employee.LojaID || profile.LojaID || "",
+            MesReferencia: context.month,
+            Status: "Pendente",
+            OrigemTipo: "ESPELHO_PONTO",
+            DataEnvio: nowIso(),
+            CriadoPor: "Fechamento Mensal Automático",
+          };
+          existingDoc = await runtime.upsert("Documentos", newDoc).catch(() => null);
+        }
+
+        if (existingDoc) {
+          signatureInfo = {
+            isSigned: existingDoc.Status === "Assinado",
+            status: existingDoc.Status || "Pendente",
+            dataAssinatura: existingDoc.DataAssinatura || "",
+            codigoValidacao: existingDoc.CodigoValidacao || "",
+            hashDocumentoFinalSHA256: existingDoc.HashDocumentoFinalSHA256 || "",
+            ultimoMotivoContestacao: existingDoc.UltimoMotivoContestacao || "",
+          };
+        }
+      } catch {
+        // Tabela ou documento ainda não gravado
+      }
+
+      return success(
+        {
+          month: context.month,
+          employee: {
+            nome: employee.Nome || profile.Nome || "Colaborador",
+            cpf: employee.CPF || "",
+            cargo: employee.Cargo || profile.Cargo || "Colaborador",
+            loja:
+              store.NomeLoja ||
+              employee.NomeLoja ||
+              profile.NomeLoja ||
+              "Grupo House 190",
+            cnpj: store.CNPJ || "Grupo House 190",
+            endereco: store.Morada
+              ? `${store.Morada}, ${store.Cidade || ""}`
+              : "Teixeira de Freitas - BA",
+          },
+          days: context.days.map((item) => ({
+            data: item.data,
+            entrada: item.entrada || "",
+            saidaIntervalo: item.saidaIntervalo || "",
+            retornoIntervalo: item.retornoIntervalo || "",
+            saida: item.saida || "",
+            trabalhado: item.trabalhadoTexto || "0h 00min",
+            previsto: item.previstoTexto || "0h 00min",
+            saldo: item.saldoTexto || "0h 00min",
+            folga: item.folga,
+            folgaFixa: item.folgaFixa,
+            trabalhou: item.trabalhou,
+            justificado: item.justificado,
+            justificativa: item.justificativaTipo || "",
+            observacao: item.justificativaObservacao || "",
+          })),
+          summary: {
+            ...context.summary,
+            saldoMesTexto: context.summary?.saldoTexto || "0h 00min",
+            saldoMesMinutos: context.summary?.saldoMinutos || 0,
+            saldoAcumuladoTexto,
+            saldoAcumuladoMinutos,
+          },
+          signature: signatureInfo,
+        },
+        "Espelho de ponto apurado com sucesso.",
+      );
+    },
+
+    /**
+     * Assinatura Eletrônica e Contestação do Espelho de Ponto (Portaria MTP nº 671/2021)
+     */
+    async signMonthlyTimeClockMirror(args) {
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const profile = await runtime.requireProfile();
+      const isCollab = !isAdmin(profile) && !isManager(profile);
+      const month = String(payload.month || "").trim() || monthIso(todayIso());
+      const targetEmpId = isCollab
+        ? String(profile.FuncionarioID || "").trim()
+        : String(payload.funcionarioId || profile.FuncionarioID || "").trim();
+
+      assert(targetEmpId, "Funcionário não identificado.");
+      assert(month, "Mês de referência não informado.");
+
+      const employees = await runtime.list("Funcionarios", { profile }).catch(() => []);
+      const targetEmp =
+        employees.find((e) => String(e.FuncionarioID || e.id || "") === targetEmpId) || {};
+      const docId = `ESPELHO_${month}_${targetEmpId}`;
+
+      // Caso de Contestação
+      if (payload.contestar) {
+        const motivo = String(payload.motivoContestacao || "").trim();
+        assert(motivo.length >= 5, "Informe o motivo da contestação (mínimo 5 caracteres).");
+
+        const record = {
+          DocID: docId,
+          DocumentoID: docId,
+          Titulo: `Espelho de Ponto — ${month}`,
+          Tipo: "Espelho de Ponto",
+          Descricao: `Espelho de ponto mensal de ${month} contestado pelo colaborador.`,
+          FuncionarioID: targetEmpId,
+          NomeFuncionario: targetEmp.Nome || profile.Nome || "Colaborador",
+          CPFFuncionario: targetEmp.CPF || "",
+          CargoFuncionario: targetEmp.Cargo || "",
+          LojaID: targetEmp.LojaID || profile.LojaID || "",
+          MesReferencia: month,
+          Status: "Contestado",
+          UltimoMotivoContestacao: motivo,
+          DataContestacao: nowIso(),
+          DataEnvio: nowIso(),
+          CriadoPor: profile.Email || profile.Nome || "Colaborador",
+        };
+
+        await runtime.upsert("Documentos", record);
+
+        try {
+          await createNotification({
+            storeId: targetEmp.LojaID || profile.LojaID,
+            type: "Ponto",
+            subject: "Espelho de Ponto Contestado",
+            message: `${targetEmp.Nome || profile.Nome} contestou a apuração do espelho de ponto de ${month}: "${motivo}".`,
+            relatedId: docId,
+          });
+        } catch (err) {
+          console.warn("Falha ao notificar contestação:", err);
+        }
+
+        return success(
+          {
+            status: "Contestado",
+            motivo,
+            documentoId: docId,
+          },
+          "Contestação registrada com sucesso. O gestor analisará os apontamentos.",
+        );
+      }
+
+      // Caso de Assinatura Digital
+      const rubrica = String(payload.rubricaBase64 || "").trim();
+      assert(rubrica, "A rubrica manuscrita é obrigatória para a assinatura digital.");
+
+      const signTime = nowIso();
+      const timestampUtc = Date.now();
+      const validationCode = `H190-${uuid().slice(0, 4).toUpperCase()}-${uuid().slice(4, 8).toUpperCase()}`;
+
+      // Cálculo de integridade SHA-256 do espelho
+      const summaryStr = JSON.stringify(payload.summary || {}) + `_${month}_${targetEmpId}_${signTime}`;
+      const hashFinal = await sha256Hex(summaryStr);
+
+      const docRecord = {
+        DocID: docId,
+        DocumentoID: docId,
+        Titulo: `Espelho de Ponto — ${month}`,
+        Tipo: "Espelho de Ponto",
+        Descricao: `Espelho de ponto mensal de ${month} conferido e assinado digitalmente nos termos da Portaria MTP nº 671/2021.`,
+        FuncionarioID: targetEmpId,
+        NomeFuncionario: targetEmp.Nome || profile.Nome || "Colaborador",
+        CPFFuncionario: targetEmp.CPF || "",
+        CargoFuncionario: targetEmp.Cargo || "",
+        LojaID: targetEmp.LojaID || profile.LojaID || "",
+        MesReferencia: month,
+        Status: "Assinado",
+        OrigemTipo: "ESPELHO_PONTO",
+        CodigoValidacao: validationCode,
+        HashDocumentoFinalSHA256: hashFinal,
+        DataAssinatura: signTime,
+        DataEnvio: signTime,
+        CriadoPor: profile.Email || profile.Nome || "Colaborador",
+      };
+
+      await runtime.upsert("Documentos", docRecord);
+
+      const sigId = `ASS_${docId}`;
+      const sigRecord = {
+        AssinaturaID: sigId,
+        DocumentoID: docId,
+        FuncionarioID: targetEmpId,
+        NomeSignatario: targetEmp.Nome || profile.Nome || "Colaborador",
+        CPFSignatario: targetEmp.CPF || "",
+        LojaID: targetEmp.LojaID || profile.LojaID || "",
+        DataHoraAssinatura: signTime,
+        TimestampUTC: timestampUtc,
+        EnderecoIP: String(payload.enderecoIp || "Dispositivo Móvel"),
+        DispositivoInfo: String(payload.dispositivoInfo || "Navegador Web / Mobile"),
+        AssinaturaRubricaBase64: rubrica,
+        HashDocumentoFinalSHA256: hashFinal,
+        CodigoValidacao: validationCode,
+      };
+
+      await runtime.upsert("DocumentosAssinaturas", sigRecord);
+
+      try {
+        await createNotification({
+          storeId: targetEmp.LojaID || profile.LojaID,
+          type: "Ponto",
+          subject: "Espelho de Ponto Assinado",
+          message: `${targetEmp.Nome || profile.Nome} assinou digitalmente o espelho de ponto de ${month}.`,
+          relatedId: docId,
+        });
+      } catch (err) {
+        console.warn("Falha ao notificar assinatura:", err);
+      }
+
+      return success(
+        {
+          signed: true,
+          status: "Assinado",
+          codigoValidacao: validationCode,
+          dataAssinatura: signTime,
+          hashDocumentoFinalSHA256: hashFinal,
+          documentoId: docId,
+        },
+        "Espelho de ponto assinado digitalmente com sucesso!",
+      );
+    },
+
+    async corrigirEntradasDuplicadasPonto() {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const records = await runtime.list("RegistrosPonto", { profile });
+      const first = new Map();
+      let corrected = 0;
+      const affected = new Set();
+      for (const record of records
+        .filter(
+          (item) =>
+            item.TipoMarcacao === "ENTRADA" &&
+            item.Status !== "Substituído",
+        )
+        .sort(compareRecordsByDateTime)) {
+        const key = `${record.FuncionarioID}|${record.Data}`;
+        if (!first.has(key)) first.set(key, record);
+        else {
+          await runtime.patch("RegistrosPonto", record.RegistroPontoID, {
+            Status: "Substituído",
+            Ajustado: true,
+            RegistroOriginalID: first.get(key).RegistroPontoID,
+            Observacoes: "Entrada duplicada desconsiderada pela correção.",
+          });
+          corrected += 1;
+          affected.add(key);
+        }
+      }
+      return success({
+        corrigidas: corrected,
+        funcionariosAfetados: affected.size,
+      });
+    },
+
+    async getHourBalanceOverviewWithSession(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const filters = values[0] || {};
+      const [employees, records, schedules, timeOff, justifications, movements] =
+        await Promise.all([
+          runtime.list("Funcionarios", { profile }),
+          runtime.list("RegistrosPonto", { profile }),
+          runtime.list("JornadasPonto", { profile }),
+          runtime.list("Folgas", { profile }),
+          runtime.list("JustificativasPonto", { profile }),
+          runtime.list("BancoHorasMovimentos", { profile }),
+        ]);
+      const result = accumulatedHourBalance({
+        employees,
+        records,
+        schedules,
+        timeOff,
+        justifications,
+        movements,
+        throughMonth: filters.month || monthIso(),
+        employeeId: filters.funcionarioId || "",
+      });
+      // Para gestores e administradores, calcular também o saldo individual
+      // do próprio usuário logado, para exibir no card "Meu saldo" do dashboard.
+      if (!filters.funcionarioId && isManager(profile) && profile.FuncionarioID) {
+        const selfResult = accumulatedHourBalance({
+          employees,
+          records,
+          schedules,
+          timeOff,
+          justifications,
+          movements,
+          throughMonth: filters.month || monthIso(),
+          employeeId: String(profile.FuncionarioID),
+        });
+        const selfEntry = (selfResult.employees || [])[0] || null;
+        result.selfBalance = selfEntry
+          ? {
+              saldoMinutos: selfEntry.saldoMinutos,
+              saldoTexto: selfEntry.saldoTexto,
+              desde: selfEntry.desde || "",
+            }
+          : null;
+      }
+      return success(result);
+    },
+
+    async adjustHourBalanceWithSession(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employee = await runtime.getById(
+        "Funcionarios",
+        payload.funcionarioId || payload.FuncionarioID,
+      );
+      assert(employee, "Funcionário não encontrado.");
+      const date = normalizedDateKey(payload.data || todayIso());
+      const minutes = Math.trunc(Number(payload.minutos));
+      const reason = String(payload.motivo || "").trim();
+      const requestId = String(payload.requestId || "").trim();
+      assert(
+        /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= todayIso(),
+        "Informe uma data válida, sem usar uma data futura.",
+      );
+      assert(
+        Number.isFinite(minutes) && minutes !== 0 && Math.abs(minutes) <= 240 * 60,
+        "Informe um ajuste entre -240h e +240h.",
+      );
+      assert(reason.length >= 5, "Explique o motivo do ajuste.");
+      assert(
+        /^[A-Za-z0-9_-]{16,100}$/.test(requestId),
+        "Identificador do ajuste inválido. Atualize a página e tente novamente.",
+      );
+      const movement = await runtime.upsert("BancoHorasMovimentos", {
+        // A mesma tentativa sempre usa a mesma chave. Se a resposta se perder
+        // e o navegador reenviar, o Firebase substitui o registro em vez de
+        // somar o ajuste outra vez.
+        MovID: `ajuste-${requestId}`,
+        RequestID: requestId,
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        LojaID: employee.LojaID || "",
+        NomeLoja: employee.NomeLoja || "",
+        Data: date,
+        HorasTrabalhadas: 0,
+        JornadaContratual: 0,
+        SaldoMinutos: minutes,
+        SaldoDia: minutes / 60,
+        SaldoAcumulado: 0,
+        Origem: "Ajuste manual do saldo de horas",
+        Observacao: reason,
+        DataCriacao: nowIso(),
+        CriadoPor: profile.Email,
+      });
+      await audit(
+        "Ajustar saldo de horas",
+        "BancoHorasMovimentos",
+        movement.MovID,
+        { after: movement },
+      );
+      return success(movement, "Saldo de horas ajustado.");
+    },
+
+    async getIncompletePunchesWithSession(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const filters = values[0] || {};
+      const currentMonth = monthIso();
+      const prevMonth = previousDateKey(todayIso()).slice(0, 7);
+      const periods = new Set([currentMonth, prevMonth]);
+      if (filters.month && /^\d{4}-\d{2}$/.test(filters.month)) {
+        periods.add(filters.month);
+      }
+      const [employees, records, schedules] = await Promise.all([
+        runtime.list("Funcionarios", { profile }),
+        runtime.listPeriods("RegistrosPonto", [...periods], { profile }),
+        runtime.list("JornadasPonto", { profile }),
+      ]);
+      const allowedEmployees = employees.filter((e) =>
+        isAdmin(profile) ? true : String(e.LojaID || "") === String(profile.LojaID || ""),
+      );
+      const incomplete = findIncompletePunches(
+        records,
+        schedules,
+        allowedEmployees,
+        todayIso(),
+      );
+      return success({
+        incompletos: incomplete,
+        total: incomplete.length,
+      });
+    },
+
+    async quickFixIncompletePunch(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employeeId = String(
+        payload.funcionarioId || payload.FuncionarioID || "",
+      ).trim();
+      const employee = await runtime.getById("Funcionarios", employeeId);
+      assert(employee, "Funcionário não encontrado.");
+      scopeRecord(profile, employee);
+      const date = normalizedDateKey(payload.data);
+      assert(
+        /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= todayIso(),
+        "Informe uma data válida.",
+      );
+      const time = String(
+        payload.horaSaida || payload.horario || "23:00",
+      ).trim();
+      assert(
+        /^([01]\d|2[0-3]):[0-5]\d$/.test(time),
+        "Informe um horário válido no formato HH:MM.",
+      );
+      let exitDate = date;
+      const [exitH, exitM] = time.split(":").map(Number);
+      const exitMinutes = exitH * 60 + exitM;
+      try {
+        const periodMonth = date.slice(0, 7);
+        const monthRecords = await runtime.listPeriods("RegistrosPonto", [periodMonth], { profile });
+        const entryRecord = (monthRecords || []).find(
+          (r) =>
+            String(r.FuncionarioID) === employeeId &&
+            normalizedDateKey(r.Data) === date &&
+            r.TipoMarcacao === "ENTRADA" &&
+            r.Status !== "Substituído",
+        );
+        if (entryRecord && entryRecord.DataHora) {
+          const entryParts = getLocalTimeParts(entryRecord.DataHora);
+          if (entryParts && exitMinutes < entryParts.totalMinutes) {
+            const nextDay = new Date(`${date}T12:00:00`);
+            nextDay.setDate(nextDay.getDate() + 1);
+            exitDate = todayIso(nextDay);
+          }
+        }
+      } catch (_) {}
+      const exitDateTime = `${exitDate}T${time}:00`;
+      const observation = String(payload.observacao || "").trim();
+
+      const record = {
+        RegistroPontoID: uuid(),
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        EmailFuncionario: employee.Email,
+        LojaID: employee.LojaID || "",
+        NomeLoja: employee.NomeLoja || "",
+        Data: date,
+        TipoMarcacao: "SAIDA_FINAL",
+        DataHora: exitDateTime,
+        Latitude: 0,
+        Longitude: 0,
+        PrecisaoMetros: 0,
+        DistanciaLojaMetros: 0,
+        DentroRaio: true,
+        Origem: "Ajuste rápido pelo gestor (saída esquecida)",
+        SelfieStorage: "Nenhum",
+        Status: "Válido",
+        Observacoes:
+          observation ||
+          `Saída registrada pelo gestor ${profile.Email} por esquecimento de batida.`,
+        Ajustado: true,
+        RegistroOriginalID: "",
+        DataCriacao: nowIso(),
+        ForaHorario: false,
+        CriadoPor: profile.Email,
+        RequestID: uuid(),
+      };
+
+      const saved = await runtime.create("RegistrosPonto", record);
+      await audit(
+        "Ajuste rápido de saída esquecida",
+        "RegistrosPonto",
+        saved.RegistroPontoID,
+        { after: saved },
+      );
+
+      return success(saved, "Saída registrada com sucesso.");
+    },
+
+    async settleOrConvertHourBalanceWithSession(args) {
+      const profile = await runtime.requireProfile();
+      requireManager(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const employeeId = String(
+        payload.funcionarioId || payload.FuncionarioID || "",
+      ).trim();
+      const employee = await runtime.getById("Funcionarios", employeeId);
+      assert(employee, "Funcionário não encontrado.");
+      scopeRecord(profile, employee);
+      const month = String(payload.month || monthIso()).slice(0, 7);
+      assert(/^\d{4}-\d{2}$/.test(month), "Competência inválida.");
+      const mode = String(payload.modo || "converter_folga");
+      const minutes = Math.trunc(Number(payload.minutos || 0));
+      assert(minutes > 0, "Informe uma quantidade de minutos maior que zero.");
+      const reason = String(payload.motivo || "").trim();
+      const requestId = String(payload.requestId || uuid()).trim();
+
+      let resultFolgas = null;
+      if (mode === "converter_folga") {
+        const leaveUnits = Math.max(0.5, Number(payload.folgas || 1));
+        const movementKey = `conversao-banco-${requestId}`;
+        resultFolgas = await runtime.applyEmployeeLeaveBalance({
+          employeeId: employee.FuncionarioID,
+          movementKey,
+          desiredDelta: leaveUnits,
+          metadata: {
+            Tipo: "Conversão de banco de horas em folga",
+            Competencia: month,
+            MinutosAbatidos: minutes,
+          },
+        });
+        await runtime
+          .upsert("MovimentosSaldoFolgas", {
+            MovimentoID: movementKey,
+            FuncionarioID: employee.FuncionarioID,
+            NomeFuncionario: employee.Nome || "",
+            LojaID: employee.LojaID || "",
+            Tipo: "Conversão de banco de horas em folga",
+            Competencia: month,
+            Delta: leaveUnits,
+            AjusteAplicado: leaveUnits,
+            SaldoAntes: resultFolgas.balanceBefore,
+            SaldoDepois: resultFolgas.balanceAfter,
+            DataMovimento: nowIso(),
+            CriadoPor: profile.Email,
+            Status: "Aplicado",
+          })
+          .catch(() => {});
+      }
+
+      const bankMovement = await runtime.upsert("BancoHorasMovimentos", {
+        MovID: `fechamento-${requestId}`,
+        RequestID: requestId,
+        FuncionarioID: employee.FuncionarioID,
+        NomeFuncionario: employee.Nome,
+        LojaID: employee.LojaID || "",
+        NomeLoja: employee.NomeLoja || "",
+        Data: todayIso(),
+        HorasTrabalhadas: 0,
+        JornadaContratual: 0,
+        SaldoMinutos: -minutes,
+        SaldoDia: -minutes / 60,
+        SaldoAcumulado: 0,
+        Origem:
+          mode === "converter_folga"
+            ? "Conversão em folga compensatória"
+            : "Quitação de horas extras em folha",
+        Observacao:
+          reason ||
+          (mode === "converter_folga"
+            ? `Conversão de ${minutesText(minutes)} em folga(s) compensatória(s) da competência ${month}.`
+            : `Quitação de ${minutesText(minutes)} em folha da competência ${month}.`),
+        DataCriacao: nowIso(),
+        CriadoPor: profile.Email,
+      });
+
+      await audit(
+        mode === "converter_folga"
+          ? "Converter banco em folga"
+          : "Quitar banco de horas",
+        "BancoHorasMovimentos",
+        bankMovement.MovID,
+        { after: bankMovement, folgas: resultFolgas },
+      );
+
+      return success(
+        {
+          banco: bankMovement,
+          folgas: resultFolgas,
+        },
+        mode === "converter_folga"
+          ? "Horas convertidas em folga compensatória com sucesso."
+          : "Horas quitadas com sucesso.",
+      );
+    },
+
+    async resetStoreBalancesWithSession(args) {
+      const profile = await runtime.requireProfile();
+      requireAdmin(profile);
+      const values = dropClientToken(args);
+      const payload = values[0] || {};
+      const storeId = String(payload.lojaId || payload.LojaID || "").trim();
+      assert(storeId, "Selecione a loja para zerar os saldos.");
+      let store = await runtime.getById("Lojas", storeId);
+      if (!store) {
+        const stores = await runtime.list("Lojas", { profile });
+        store = stores.find(
+          (s) =>
+            String(s.LojaID || s.lojaId || s.id || s.Id || "") === storeId ||
+            String(s.NomeLoja || s.nomeLoja || s.Nome || "").trim().toLowerCase() ===
+              storeId.toLowerCase(),
+        );
+      }
+      assert(store, "Loja não encontrada.");
+      const mode = String(payload.modo || payload.tipo || "ambos").toLowerCase();
+      const reason = String(payload.motivo || "").trim();
+      assert(
+        reason.length >= 4,
+        "Informe o motivo/justificativa para zerar os saldos.",
+      );
+
+      const currentDay = todayIso();
+      const currentMonth = currentDay.slice(0, 7);
+      const targetMonth = /^\d{4}-\d{2}$/.test(
+        String(payload.month || payload.mes || ""),
+      )
+        ? String(payload.month || payload.mes)
+        : currentMonth;
+      const movementDate =
+        targetMonth < currentMonth ? lastDateOfMonth(targetMonth) : currentDay;
+
+      const [employees, records, schedules, timeOff, justifications, movements] =
+        await Promise.all([
+          runtime.list("Funcionarios", { profile }),
+          runtime.list("RegistrosPonto", { profile }),
+          runtime.list("JornadasPonto", { profile }),
+          runtime.list("Folgas", { profile }),
+          runtime.list("JustificativasPonto", { profile }),
+          runtime.list("BancoHorasMovimentos", { profile }),
+        ]);
+
+      const storeName = String(
+        store.NomeLoja || store.nomeLoja || store.Nome || "",
+      )
+        .trim()
+        .toLowerCase();
+      const actualStoreId = String(store.LojaID || store.lojaId || storeId).trim();
+      const storeEmployees = employees.filter((e) => {
+        const empLojaId = String(e.LojaID || e.lojaId || "").trim();
+        const empLoja = String(e.Loja || e.NomeLoja || "").trim().toLowerCase();
+        return (
+          (empLojaId && (empLojaId === storeId || empLojaId === actualStoreId)) ||
+          (storeName && empLoja === storeName) ||
+          (empLoja && (empLoja === storeId.toLowerCase() || empLoja === actualStoreId.toLowerCase()))
+        );
+      });
+      assert(
+        storeEmployees.length > 0,
+        "Nenhum colaborador encontrado vinculado a esta loja.",
+      );
+
+      const resetBank = mode === "banco_horas" || mode === "ambos";
+      const resetLeaves = mode === "saldo_folgas" || mode === "ambos";
+      const results = [];
+      const timestamp = nowIso();
+
+      // Calcular o saldo acumulado exato de todos os colaboradores da loja
+      const overview = accumulatedHourBalance({
+        employees: storeEmployees,
+        records,
+        schedules,
+        timeOff,
+        justifications,
+        movements,
+        throughMonth: targetMonth,
+        currentDate: currentDay,
+      });
+
+      const overviewByEmp = new Map(
+        (overview.employees || []).map((e) => [String(e.FuncionarioID || ""), e]),
+      );
+
+      for (const employee of storeEmployees) {
+        const empId = String(employee.FuncionarioID || "");
+        const empName = employee.Nome || "Colaborador";
+
+        let bankResetMinutes = 0;
+        if (resetBank) {
+          const empOverview = overviewByEmp.get(empId);
+          const currentBalance = Number(empOverview?.saldoMinutos || 0);
+          if (currentBalance !== 0) {
+            bankResetMinutes = currentBalance;
+            const requestId = uuid();
+            const resetMovement = await runtime.upsert("BancoHorasMovimentos", {
+              MovID: `reset-loja-${storeId}-${empId}-${Date.now()}`,
+              RequestID: requestId,
+              FuncionarioID: empId,
+              NomeFuncionario: empName,
+              LojaID: storeId,
+              NomeLoja: store.NomeLoja || store.Nome || "",
+              Data: movementDate,
+              HorasTrabalhadas: 0,
+              JornadaContratual: 0,
+              SaldoMinutos: -currentBalance,
+              SaldoDia: Number((-currentBalance / 60).toFixed(2)),
+              SaldoAcumulado: 0,
+              Origem: "Zerar saldos da loja pelo administrador",
+              Observacao: `Zerar saldo da loja ${store.NomeLoja || storeId}: ${reason}`,
+              DataCriacao: timestamp,
+              CriadoPor: profile.Email,
+            });
+            await audit(
+              "Zerar banco de horas da loja",
+              "BancoHorasMovimentos",
+              resetMovement.MovID,
+              { after: resetMovement },
+            );
+          }
+        }
+
+        let leaveResetUnits = 0;
+        if (resetLeaves) {
+          const currentLeaves = Number(employee.SaldoFolgas || 0);
+          if (currentLeaves !== 0) {
+            leaveResetUnits = currentLeaves;
+            const movementKey = `reset-folgas-loja-${storeId}-${empId}-${Date.now()}`;
+            try {
+              await runtime.applyEmployeeLeaveBalance({
+                employeeId: empId,
+                movementKey,
+                desiredDelta: -currentLeaves,
+                metadata: {
+                  Tipo: "Zerar saldo de folgas da loja",
+                  LojaID: storeId,
+                  Motivo: reason,
+                },
+              });
+            } catch (err) {
+              console.warn("[resetStoreBalances] applyEmployeeLeaveBalance fallback:", err);
+            }
+            // Força a gravação direta do zeramento no cadastro do funcionário
+            await runtime.patch("Funcionarios", empId, {
+              SaldoFolgas: 0,
+            });
+            await runtime.upsert("MovimentosSaldoFolgas", {
+              MovimentoID: movementKey,
+              FuncionarioID: empId,
+              NomeFuncionario: empName,
+              LojaID: storeId,
+              Tipo: "Zerar saldo de folgas da loja",
+              Competencia: targetMonth,
+              Data: movementDate,
+              DataCriacao: timestamp,
+              CriadoPor: profile.Email,
+              Observacao: reason,
+            });
+          } else {
+            await runtime.patch("Funcionarios", empId, {
+              SaldoFolgas: 0,
+            });
+          }
+        }
+
+        results.push({
+          FuncionarioID: empId,
+          Nome: empName,
+          minutosZerados: bankResetMinutes,
+          folgasZeradas: leaveResetUnits,
+        });
+      }
+
+      // Invalidar caches em memória para que todas as telas reflitam os saldos zerados
+      runtime.invalidateTableCache("BancoHorasMovimentos");
+      runtime.invalidateTableCache("Funcionarios");
+      runtime.invalidateTableCache("MovimentosSaldoFolgas");
+      runtime.invalidateTableCache("RegistrosPonto");
+
+      await audit(
+        "Zerar saldos da loja",
+        "Lojas",
+        storeId,
+        {
+          loja: store.NomeLoja || storeId,
+          modo: mode,
+          motivo: reason,
+          totalFuncionarios: results.length,
+        },
+      );
+
+      return success(
+        {
+          lojaId: storeId,
+          nomeLoja: store.NomeLoja || store.Nome || storeId,
+          modo: mode,
+          totalFuncionarios: results.length,
+          detalhes: results,
+        },
+        `Saldos da loja ${store.NomeLoja || storeId} zerados com sucesso para ${results.length} colaborador(es).`,
+      );
+    },
+
+    async getLiveStorePresenceWithSession(args) {
+      const profile = await runtime.requireProfile();
+      const values = dropClientToken(args);
+      const filters = values[0] || {};
+      const targetStoreId = String(
+        filters.storeId || filters.LojaID || profile.LojaID || "",
+      );
+      const currentDay = todayIso();
+      const [employees, records, schedules, timeOff] = await Promise.all([
+        runtime.list("Funcionarios", { profile }),
+        runtime.listPeriods("RegistrosPonto", [currentDay.slice(0, 7)], {
+          profile,
+        }),
+        runtime.list("JornadasPonto", { profile }),
+        runtime.list("Folgas", { profile }),
+      ]);
+      let allowedEmployees = employees.filter((e) => asBoolean(e.Ativo));
+      if (!isAdmin(profile) && targetStoreId) {
+        allowedEmployees = allowedEmployees.filter(
+          (e) => String(e.LojaID || "") === targetStoreId,
+        );
+      } else if (targetStoreId) {
+        allowedEmployees = allowedEmployees.filter(
+          (e) => String(e.LojaID || "") === targetStoreId,
+        );
+      }
+      return success(
+        calculateLivePresence(
+          allowedEmployees,
+          records,
+          schedules,
+          timeOff,
+          new Date(),
+        ),
+      );
+    },
+  };
+}
+
+export const calculateLivePresence = (
+  employees = [],
+  records = [],
+  schedules = [],
+  timeOff = [],
+  now = new Date(),
+) => {
+  const currentDay = todayIso(now);
+  const nowTs = now.getTime();
+  const validRecords = records.filter(
+    (item) =>
+      item.FuncionarioID &&
+      item.Status !== "Substituído" &&
+      normalizedDateKey(item.Data || item.DataHora) === currentDay,
+  );
+
+  const byEmployee = new Map();
+  validRecords.forEach((r) => {
+    const list = byEmployee.get(String(r.FuncionarioID)) || [];
+    list.push(r);
+    byEmployee.set(String(r.FuncionarioID), list);
+  });
+
+  const presenceList = [];
+  employees.forEach((emp) => {
+    if (!asBoolean(emp.Ativo)) return;
+    const empId = String(emp.FuncionarioID);
+    const rows = (byEmployee.get(empId) || []).sort(compareRecordsByDateTime);
+    const approvedOff = timeOff.find(
+      (item) =>
+        item.FuncionarioID === emp.FuncionarioID &&
+        ["Aprovada", "Concluída"].includes(item.Status) &&
+        normalizedDateKey(item.DataInicio) <= currentDay &&
+        normalizedDateKey(item.DataFim || item.DataInicio) >= currentDay,
+    );
+    const fixedOff =
+      !approvedOff && isFixedOffForDate(emp, currentDay, timeOff);
+    const sched = scheduleFor(schedules, empId, currentDay);
+
+    let status = "ausente";
+    let statusLabel = "Sem jornada cadastrada";
+    if (sched) {
+      const expectedEntry = clockMinutes(sched.HoraEntrada);
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      statusLabel = expectedEntry !== null && currentMinutes < expectedEntry
+        ? "Aguardando entrada" : "Sem registro de entrada";
+    }
+    let entryTime = "";
+    let lastPunchType = "";
+    let lastPunchTime = "";
+    let elapsedMinutes = 0;
+    let alertLevel = "normal";
+    let alertMessage = "";
+
+    if (approvedOff || fixedOff) {
+      status = "folga";
+      statusLabel = approvedOff ? "De folga" : "Folga fixa";
+    }
+
+    if (rows.length > 0) {
+      const entry = rows.find((r) => r.TipoMarcacao === "ENTRADA");
+      const last = rows[rows.length - 1];
+      lastPunchType = last.TipoMarcacao;
+      lastPunchTime = timeValue(last.DataHora);
+      if (entry) entryTime = timeValue(entry.DataHora);
+
+      if (lastPunchType === "SAIDA_FINAL") {
+        status = "concluido";
+        statusLabel = "Turno encerrado";
+      } else if (lastPunchType === "SAIDA_INTERVALO") {
+        status = "intervalo";
+        statusLabel = "Em intervalo";
+      } else {
+        status = "trabalhando";
+        statusLabel = "Trabalhando agora";
+
+        if (entry?.DataHora) {
+          const entryTs = new Date(entry.DataHora).getTime();
+          const breakOut = rows.find(
+            (r) => r.TipoMarcacao === "SAIDA_INTERVALO",
+          );
+          const breakIn = rows.find(
+            (r) => r.TipoMarcacao === "RETORNO_INTERVALO",
+          );
+          let breakDuration = 0;
+          if (breakOut && breakIn) {
+            breakDuration = exactMinutesBetween(
+              breakOut.DataHora,
+              breakIn.DataHora,
+            );
+          }
+          if (Number.isFinite(entryTs) && nowTs >= entryTs) {
+            elapsedMinutes = Math.max(
+              0,
+              Math.round((nowTs - entryTs) / 60000) - breakDuration,
+            );
+          }
+
+          // Limiares baseados na jornada real do funcionário.
+          // "Hora extra" = jornada prevista + 30min de tolerância.
+          // "Limite excessivo" = limiar fixo de revisão (12h brutas).
+          const expectedShiftMinutes = sched
+            ? scheduleExpectedMinutes(sched)
+            : 8 * 60;
+          const overtimeThreshold = expectedShiftMinutes + 30;
+          const dangerThreshold = MAX_DAILY_WORK_MINUTES; // 12 * 60
+
+          if (elapsedMinutes >= dangerThreshold) {
+            alertLevel = "danger";
+            alertMessage = `🚨 ${minutesText(elapsedMinutes)} em turno (Limite excessivo)`;
+          } else if (elapsedMinutes >= overtimeThreshold) {
+            alertLevel = "warning";
+            alertMessage = `⚠️ ${minutesText(elapsedMinutes)} em turno (Hora extra)`;
+          }
+        }
+      }
+    }
+
+    const empName =
+      emp.Nome ||
+      emp.nome ||
+      emp.NomeFuncionario ||
+      emp.nomeFuncionario ||
+      emp.NomeCompleto ||
+      emp.nomeCompleto ||
+      emp["Nome Completo"] ||
+      emp.Funcionario ||
+      emp.funcionario ||
+      rows[0]?.NomeFuncionario ||
+      rows[0]?.Nome ||
+      rows[0]?.nomeFuncionario ||
+      "";
+
+    presenceList.push({
+      FuncionarioID: emp.FuncionarioID || emp.funcionarioId || emp.id || "",
+      Nome: empName,
+      Cargo: emp.Cargo || emp.cargo || "Equipe",
+      LojaID: emp.LojaID || emp.lojaId || "",
+      NomeLoja: emp.NomeLoja || emp.nomeLoja || "",
+      status,
+      statusLabel,
+      entryTime,
+      lastPunchType,
+      lastPunchTime,
+      elapsedMinutes,
+      elapsedTexto: elapsedMinutes > 0 ? minutesText(elapsedMinutes) : "",
+      alertLevel,
+      alertMessage,
+      horarioEscala: formatScheduleTime(sched),
+      breakReturnTime: status === "intervalo" && Number(sched?.DuracaoIntervaloMinutos) > 0 && Number.isFinite(new Date(rows[rows.length - 1].DataHora).getTime())
+        ? timeValue(new Date(new Date(rows[rows.length - 1].DataHora).getTime() + Number(sched.DuracaoIntervaloMinutos) * 60000).toISOString()) : "",
+    });
+  });
+
+  const order = {
+    trabalhando: 0,
+    intervalo: 1,
+    concluido: 2,
+    ausente: 3,
+    folga: 4,
+  };
+  presenceList.sort((a, b) => {
+    const diff = (order[a.status] ?? 99) - (order[b.status] ?? 99);
+    if (diff !== 0) return diff;
+    return (b.elapsedMinutes || 0) - (a.elapsedMinutes || 0);
+  });
+
+  const totals = {
+    trabalhando: presenceList.filter((p) => p.status === "trabalhando").length,
+    intervalo: presenceList.filter((p) => p.status === "intervalo").length,
+    concluido: presenceList.filter((p) => p.status === "concluido").length,
+    ausente: presenceList.filter((p) => p.status === "ausente").length,
+    folga: presenceList.filter((p) => p.status === "folga").length,
+    alertas: presenceList.filter((p) => p.alertLevel !== "normal").length,
+    total: presenceList.length,
+  };
+
+  return {
+    date: currentDay,
+    presence: presenceList,
+    totals,
+  };
+};
+
+export const findIncompletePunches = (
+  records = [],
+  schedules = [],
+  employees = [],
+  currentDay = todayIso(),
+) => {
+  const employeeMap = new Map(
+    employees.map((e) => [String(e.FuncionarioID || ""), e]),
+  );
+  const validRecords = records.filter(
+    (item) =>
+      item.FuncionarioID &&
+      item.Status !== "Substituído" &&
+      normalizedDateKey(item.Data || item.DataHora) < currentDay,
+  );
+  const byEmployeeDate = new Map();
+  validRecords.forEach((record) => {
+    const date = normalizedDateKey(record.Data || record.DataHora);
+    const key = `${record.FuncionarioID}|${date}`;
+    const list = byEmployeeDate.get(key) || [];
+    list.push(record);
+    byEmployeeDate.set(key, list);
+  });
+
+  const incomplete = [];
+  for (const [key, rows] of byEmployeeDate.entries()) {
+    const [empId, date] = key.split("|");
+    const emp = employeeMap.get(empId);
+    if (!emp || !asBoolean(emp.Ativo)) continue;
+    const sorted = rows.sort(compareRecordsByDateTime);
+    const sched = scheduleFor(schedules, empId, date);
+    const hasEntry = sorted.some((r) => r.TipoMarcacao === "ENTRADA");
+    const hasExit = sorted.some((r) => r.TipoMarcacao === "SAIDA_FINAL");
+    const hasBreakOut = sorted.some(
+      (r) => r.TipoMarcacao === "SAIDA_INTERVALO",
+    );
+    const hasBreakIn = sorted.some(
+      (r) => r.TipoMarcacao === "RETORNO_INTERVALO",
+    );
+    const noBreak = sorted.some((r) => r.TipoMarcacao === "SEM_DESCANSO");
+    const middleRequired =
+      Number(sched?.DuracaoIntervaloMinutos || 0) > 0 ||
+      asBoolean(sched?.HorarioFlexivelDoisTurnos);
+    const complete =
+      hasEntry &&
+      hasExit &&
+      (!middleRequired || noBreak || (hasBreakOut && hasBreakIn));
+    if (!complete) {
+      const entry = sorted.find((r) => r.TipoMarcacao === "ENTRADA");
+      const last = sorted[sorted.length - 1];
+      const suggestedExit = calculateSuggestedExit(
+        sched,
+        entry?.DataHora || last?.DataHora,
+      );
+      const empName =
+        emp.Nome ||
+        emp.nome ||
+        emp.NomeFuncionario ||
+        emp.nomeFuncionario ||
+        emp.NomeCompleto ||
+        emp.nomeCompleto ||
+        emp["Nome Completo"] ||
+        emp.Funcionario ||
+        emp.funcionario ||
+        entry?.NomeFuncionario ||
+        rows[0]?.NomeFuncionario ||
+        rows[0]?.Nome ||
+        "Colaborador";
+      const storeName =
+        emp.NomeLoja ||
+        emp.nomeLoja ||
+        entry?.NomeLoja ||
+        rows[0]?.NomeLoja ||
+        "";
+      incomplete.push({
+        FuncionarioID: emp.FuncionarioID,
+        NomeFuncionario: empName,
+        LojaID: emp.LojaID || "",
+        NomeLoja: storeName,
+        Data: date,
+        DataBR: date.split("-").reverse().join("/"),
+        EntradaDataHora: entry?.DataHora || "",
+        EntradaTexto: entry ? timeValue(entry.DataHora) : "Não registrada",
+        UltimaMarcacao: last.TipoMarcacao,
+        UltimaMarcacaoTexto: timeValue(last.DataHora),
+        HorarioSugeridoSaida: suggestedExit,
+        SugestaoDataHora: `${date}T${suggestedExit}:00`,
+      });
+    }
+  }
+  return incomplete.sort((a, b) => b.Data.localeCompare(a.Data));
+};
+
+export {
+  accumulatedHourBalance,
+  balanceDays,
+  clockContext,
+  dayBalanceState,
+  dayMetrics,
+  firstPunchDatesByEmployee,
+  fixedOffWeekdayIndexes,
+  isScheduledWorkday,
+  operationalDayFor,
+  scheduleExpectedMinutes,
+};

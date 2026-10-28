@@ -1,0 +1,2055 @@
+<dialog id="timeOffDialog" class="time-off-dialog">
+  <form id="timeOffForm" novalidate>
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow" id="timeOffEyebrow">SOLICITAÇÃO DE FOLGA</span>
+        <h3 id="timeOffDialogTitle">Pedir folga</h3>
+      </div>
+      <button type="button" class="icon-btn time-off-close-btn" data-close="timeOffDialog" aria-label="Fechar modal">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="timeOffId" type="hidden" />
+      <input id="timeOffStart" type="hidden" />
+      <input id="timeOffEnd" type="hidden" />
+
+      <!-- Banner de identificação e saldo do colaborador (modo funcionário) -->
+      <div id="timeOffRequesterInfo" class="time-off-requester-card hidden">
+        <div class="requester-info-main">
+          <span class="requester-tag">SOLICITANTE</span>
+          <strong id="timeOffRequesterName">Colaborador</strong>
+          <span id="timeOffRequesterStore" class="requester-store">Unidade</span>
+        </div>
+        <div class="requester-balance-box">
+          <small>Disponível</small>
+          <strong id="timeOffRequesterBalance">—</strong>
+        </div>
+      </div>
+
+      <div class="dialog-grid time-off-grid">
+        <!-- Campos gerenciais visíveis apenas para Gestor/Admin -->
+        <label id="timeOffStoreField" class="time-off-manager-only">Loja<select id="timeOffStore"></select></label>
+        <label id="timeOffEmployeeField" class="time-off-manager-only">Funcionário<select id="timeOffEmployee"></select></label>
+
+        <!-- Data da folga (único campo de data) -->
+        <label id="timeOffSingleDateField" class="time-off-date-field full">
+          <span>Data da folga</span>
+          <input id="timeOffSingleDate" type="date" />
+        </label>
+
+        <!-- Linha compacta 2-colunas: Tipo e Período -->
+        <div class="time-off-row-2col full">
+          <label id="timeOffTypeField">
+            <span>Tipo</span>
+            <select id="timeOffType">
+              <option>Folga semanal</option>
+              <option>Folga manual</option>
+              <option>Folga automática</option>
+              <option>Folga compensatória</option>
+              <option>Folga de feriado</option>
+              <option>Atestado Médico</option>
+              <option>Férias</option>
+              <option>Licença</option>
+              <option>Banco de horas</option>
+              <option>Meia folga</option>
+              <option>Outro</option>
+            </select>
+          </label>
+          <label id="timeOffPeriodField">
+            <span>Período</span>
+            <select id="timeOffPeriod">
+              <option>Dia inteiro</option>
+              <option>Manhã</option>
+              <option>Tarde</option>
+              <option>Horário personalizado</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Motivo / Observação -->
+        <label class="full time-off-reason-field">
+          <span>Motivo ou observação</span>
+          <textarea
+            id="timeOffReason"
+            placeholder="Adicione um motivo ou observação"
+          ></textarea>
+        </label>
+
+        <!-- Opções administrativas (somente gestor) -->
+        <div id="timeOffManagerSwitches" class="time-off-manager-only full time-off-switches-box">
+          <label class="switch-label">
+            <input id="timeOffImmediate" type="checkbox" />
+            <span>Aprovar imediatamente</span>
+          </label>
+          <label class="switch-label">
+            <input id="timeOffCalendar" type="checkbox" checked />
+            <span>Criar no Google Calendar</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-actions time-off-actions">
+      <button
+        type="button"
+        class="btn btn-secondary time-off-cancel-btn"
+        data-close="timeOffDialog"
+      >
+        Cancelar
+      </button>
+      <button
+        type="button"
+        id="validateTimeOffButton"
+        class="btn btn-secondary time-off-validate-btn"
+      >
+        Validar
+      </button>
+      <button class="btn btn-primary time-off-submit-btn" type="submit" id="timeOffSubmitBtn">
+        Enviar solicitação ↗
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="clockJustificationDialog">
+  <form id="clockJustificationForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">PONTO NÃO BATIDO</span>
+        <h3>Justificar ausência</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="clockJustificationDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <input id="clockJustificationEmployeeId" type="hidden" />
+      <input id="clockJustificationDate" type="hidden" />
+      <p id="clockJustificationEmployee" style="font-weight: 600; font-size: 15px; margin-bottom: 12px;"></p>
+      <div id="clockJustificationManualFields" class="dialog-grid hidden" style="margin-bottom: 14px;">
+        <label>Colaborador
+          <select id="clockJustificationEmployeeSelect">
+            <option value="">Selecione o colaborador...</option>
+          </select>
+        </label>
+        <label>Data da ausência
+          <input id="clockJustificationDateInput" type="date" />
+        </label>
+      </div>
+      <div class="dialog-grid">
+        <label>Motivo
+          <select id="clockJustificationType" required>
+            <option>Atestado</option>
+            <option>Folga trocada</option>
+            <option>Dia concedido</option>
+            <option>Outros</option>
+          </select>
+        </label>
+        <label class="full">Observação
+          <textarea id="clockJustificationObservation" placeholder="Obrigatório para Outros"></textarea>
+        </label>
+      </div>
+      <p class="form-hint">
+        O dia ficará com saldo zerado e a justificativa será registrada na auditoria.
+      </p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="clockJustificationDialog">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Salvar justificativa</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="hourBalanceAdjustmentDialog">
+  <form id="hourBalanceAdjustmentForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">BANCO DE HORAS</span>
+        <h3>Ajustar saldo</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="hourBalanceAdjustmentDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <input id="hourBalanceAdjustmentEmployeeId" type="hidden" />
+      <p id="hourBalanceAdjustmentEmployee"></p>
+      <p id="hourBalanceAdjustmentCurrent" class="form-hint"></p>
+      <div class="dialog-grid">
+        <label>Operação
+          <select id="hourBalanceAdjustmentOperation" required>
+            <option value="add">Adicionar horas</option>
+            <option value="subtract">Descontar horas</option>
+          </select>
+        </label>
+        <label>Data
+          <input id="hourBalanceAdjustmentDate" type="date" required />
+        </label>
+        <label>Horas
+          <input id="hourBalanceAdjustmentHours" type="number" min="0" max="240" step="1" value="0" required />
+        </label>
+        <label>Minutos
+          <input id="hourBalanceAdjustmentMinutes" type="number" min="0" max="59" step="1" value="0" required />
+        </label>
+        <label class="full">Motivo
+          <textarea id="hourBalanceAdjustmentReason" minlength="5" required placeholder="Explique por que o saldo está sendo ajustado"></textarea>
+        </label>
+      </div>
+      <p class="form-hint">O ajuste será somado ao cálculo e ficará registrado na auditoria. As batidas originais não serão alteradas.</p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="hourBalanceAdjustmentDialog">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Salvar ajuste</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="approvalDialog">
+  <form id="approvalForm">
+    <div class="dialog-head">
+      <h3 id="approvalTitle">Aprovar pedido</h3>
+      <button type="button" class="icon-btn" data-close="approvalDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="approvalId" type="hidden" /><input
+        id="approvalAction"
+        type="hidden"
+      /><label>Observação<textarea id="approvalObs"></textarea></label
+      ><label class="switch-label"
+        ><input id="approvalCalendar" type="checkbox" checked /> Criar evento no
+        Calendar</label
+      >
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="approvalDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="cancelDialog">
+  <form id="cancelForm">
+    <div class="dialog-head">
+      <h3>Cancelar folga</h3>
+      <button type="button" class="icon-btn" data-close="cancelDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="cancelId" type="hidden" /><label
+        >Motivo do cancelamento<textarea id="cancelReason" required></textarea>
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="cancelDialog">
+        Voltar</button
+      ><button class="btn btn-danger" type="submit">Cancelar folga</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="employeeDialog">
+  <form id="employeeForm">
+    <div class="dialog-head">
+      <h3 id="employeeDialogTitle">Novo funcionário</h3>
+      <button type="button" class="icon-btn" data-close="employeeDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="employeeId" type="hidden" />
+      <input id="employeeAvatar" type="hidden" value="avatar-00" />
+      <section class="avatar-picker-section">
+        <div class="avatar-picker-heading">
+          <div><span class="eyebrow">IDENTIDADE DE HERÓI</span><h4>Escolha o avatar</h4></div>
+          <span class="avatar-picker-hint">Aparecerá em todo o sistema</span>
+        </div>
+        <div id="employeeAvatarPicker" class="avatar-picker" role="radiogroup" aria-label="Avatar do funcionário"></div>
+      </section>
+      <div class="dialog-grid">
+        <label>Nome<input id="employeeName" required /></label
+        ><label>E-mail<input id="employeeEmail" type="email" required /></label
+        ><label>Telefone<input id="employeePhone" /></label
+        ><label
+          >CPF<input
+            id="employeeCpf"
+            inputmode="numeric"
+            maxlength="14"
+            placeholder="000.000.000-00" /></label
+        ><label>Loja<select id="employeeStore" required></select></label
+        ><label>Cargo<input id="employeeRole" /></label
+        ><label
+          >Perfil<select id="employeeProfile">
+            <option>Funcionário</option>
+            <option>Chefe de cozinha</option>
+            <option>Responsável de loja</option>
+            <option>Administrador</option>
+          </select></label
+        ><label
+          >Data de admissão<input id="employeeAdmission" type="date" /></label
+        ><label>Tipo de contrato<input id="employeeContract" /></label
+        ><label
+          >Saldo de folgas<input
+            id="employeeBalance"
+            type="number"
+            value="0" /></label
+        ><label
+          >Folga fixa<select id="employeeFixedDay1">
+            <option value="">Nenhuma</option>
+            <option>Domingo</option>
+            <option>Segunda-feira</option>
+            <option>Terça-feira</option>
+            <option>Quarta-feira</option>
+            <option>Quinta-feira</option>
+            <option>Sexta-feira</option>
+            <option>Sábado</option>
+          </select></label
+        >
+      </div>
+      <h4 class="dialog-section-title">Jornada e ponto</h4>
+      <div class="dialog-grid">
+        <label
+          >Tipo de jornada<select id="employeeJourneyType">
+            <option>Integral</option>
+            <option>Meio período</option>
+            <option>Personalizada</option>
+          </select></label
+        ><label
+          >Carga diária líquida (automática)<input
+            id="employeeDailyHours"
+            type="number"
+            min="0.01"
+            max="16"
+            step="0.01"
+            readonly
+            value="8" /></label
+        ><label class="switch-label"
+          ><input id="employeeFlexibleTwoShifts" type="checkbox" /> Jornada flexível em dois turnos</label
+        ><label
+          ><span id="employeeClockInLabel">Entrada</span><input
+            id="employeeClockIn"
+            type="time"
+            value="08:00" /></label
+        ><label
+          ><span id="employeeBreakOutLabel">Saída para intervalo</span><input
+            id="employeeBreakOut"
+            type="time"
+            value="12:00" /></label
+        ><label
+          ><span id="employeeBreakInLabel">Retorno do intervalo</span><input
+            id="employeeBreakIn"
+            type="time"
+            value="13:00" /></label
+        ><label
+          ><span id="employeeClockOutLabel">Saída final</span><input
+            id="employeeClockOut"
+            type="time"
+            value="17:00" /></label
+        ><label
+          ><span id="employeeBreakMinutesLabel">Duração do intervalo (minutos)</span><input
+            id="employeeBreakMinutes"
+            type="number"
+            min="0"
+            value="60" /></label
+        ><label
+          >Tolerância (minutos)<input
+            id="employeeTolerance"
+            type="number"
+            min="0"
+            value="5" /></label
+        ><label
+          >Dias de trabalho<input
+            id="employeeWorkDays"
+            value="1,2,3,4,5"
+            placeholder="1,2,3,4,5" /><small style="display:block;font-size:11px;color:#64748b;margin-top:2px;">0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb</small></label
+        ><label class="switch-label"
+          ><input id="employeeHourBank" type="checkbox" checked /> Controlar
+          banco de horas</label
+        ><label class="switch-label"
+          ><input id="employeeActive" type="checkbox" checked /> Funcionário
+          ativo</label
+        >
+      </div>
+      <h4 class="dialog-section-title">Conformidade LGPD</h4>
+      <div id="employeePrivacyPolicyAckBlock" style="margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-hover, #f8fafc);">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div>
+            <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--primary, #6340d8);">Ciência Digital da Política de Privacidade</span>
+            <div id="employeePrivacyPolicyAckStatus" style="font-size: 13px; font-weight: 600; color: var(--text-primary, #0f172a); margin-top: 2px;"></div>
+            <div id="employeePrivacyPolicyAckMeta" style="font-size: 11px; color: var(--text-muted, #64748b); margin-top: 2px;"></div>
+          </div>
+          <div id="employeePrivacyPolicySignatureWrap" style="display: none; background: #ffffff; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color, #cbd5e1);">
+            <div style="font-size: 9px; text-transform: uppercase; color: var(--text-muted, #94a3b8); margin-bottom: 2px;">Rubrica registrada</div>
+            <img id="employeePrivacyPolicySignatureImg" alt="Rubrica" style="max-height: 40px; display: block;" />
+          </div>
+        </div>
+      </div>
+      <div class="dialog-grid">
+        <label class="switch-label" style="grid-column: 1 / -1;"
+          ><input id="employeeLgpdConsentSigned" type="checkbox" /> Termo de consentimento físico arquivado</label
+        ><label
+          >Data da assinatura física<input id="employeeLgpdConsentDate" type="date" /></label
+        >
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        id="employeeDeleteBtn"
+        class="btn-delete-employee"
+        style="margin-right: auto; display: none;"
+        title="Excluir funcionário definitivamente"
+      >
+        Excluir funcionário
+      </button>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="employeeDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">
+        Guardar funcionário
+      </button>
+    </div>
+  </form>
+</dialog>
+<dialog id="storeDialog">
+  <form id="storeForm">
+    <div class="dialog-head">
+      <h3 id="storeDialogTitle">Nova loja</h3>
+      <button type="button" class="icon-btn" data-close="storeDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <input id="storeId" type="hidden" />
+      <div class="dialog-grid">
+        <label>Nome da loja<input id="storeName" required /></label
+        ><label>Código<input id="storeCode" required /></label
+        ><label
+          >CNPJ<input
+            id="storeCnpj"
+            inputmode="numeric"
+            maxlength="18"
+            placeholder="00.000.000/0000-00" /></label
+        ><label>Morada<input id="storeAddress" /></label
+        ><label>Cidade<input id="storeCity" /></label
+        ><label>Responsável<input id="storeManager" /></label
+        ><label
+          >E-mail do responsável<input
+            id="storeManagerEmail"
+            type="email" /></label
+        ><label>ID do Google Calendar<input id="storeCalendar" /></label
+        ><label
+          >Limite diário de folgas<input
+            id="storeLimit"
+            type="number"
+            min="1"
+            value="1" /></label
+        ><label
+          >Horário de abertura<input id="storeOpening" type="time" /></label
+        ><label>Horário de fecho<input id="storeClosing" type="time" /></label>
+      </div>
+      <h4 class="dialog-section-title">Local permitido para bater ponto</h4>
+      <div class="dialog-grid">
+        <label
+          >Latitude<input id="storeLatitude" type="number" step="any" /></label
+        ><label
+          >Longitude<input
+            id="storeLongitude"
+            type="number"
+            step="any" /></label
+        ><label
+          >Raio permitido (metros)<input
+            id="storeClockRadius"
+            type="number"
+            min="20"
+            value="150" /></label
+        ><button
+          id="captureStoreLocation"
+          type="button"
+          class="btn btn-secondary"
+        >
+          Usar localização atual</button
+        ><label class="switch-label"
+          ><input id="storeActive" type="checkbox" checked /> Loja ativa</label
+        >
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="storeDialog">
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Guardar loja</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="clockManualPunchDialog">
+  <form id="clockManualPunchForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">LANÇAMENTO ADMINISTRATIVO</span>
+        <h3>Registrar ponto para funcionário</h3>
+      </div>
+      <button
+        type="button"
+        class="icon-btn"
+        data-close="clockManualPunchDialog"
+      >
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <p class="clock-manual-notice">
+        Use quando o funcionário esquecer uma marcação. O lançamento ficará
+        identificado com seu usuário e registrado na auditoria.
+      </p>
+      <div class="dialog-grid">
+        <label class="full"
+          >Funcionário<select id="clockManualEmployee" required></select
+        ></label>
+        <label
+          >Tipo de marcação<select id="clockManualType" required>
+            <option value="ENTRADA">Entrada</option>
+            <option value="SAIDA_INTERVALO">Saída para intervalo</option>
+            <option value="RETORNO_INTERVALO">Retorno do intervalo</option>
+            <option value="SEM_DESCANSO">Não realizou o descanso</option>
+            <option value="SAIDA_FINAL">Saída final</option>
+          </select></label
+        >
+        <label
+          >Dia e horário reais<input
+            id="clockManualDateTime"
+            type="datetime-local"
+            required /></label
+        >
+        <label
+          >Dia da jornada<input
+            id="clockManualOperationalDay"
+            type="date"
+            required /><small
+            >Se a saída ocorreu após meia-noite, informe o dia em que o turno
+            começou.</small
+          ></label
+        >
+        <label class="full"
+          >Motivo<textarea
+            id="clockManualReason"
+            maxlength="1000"
+            required
+            placeholder="Ex.: funcionário esqueceu de registrar a saída"
+          ></textarea>
+        </label>
+      </div>
+      <p class="clock-manual-footnote">
+        Se o horário for depois da meia-noite e o turno anterior ainda estiver
+        aberto, o sistema manterá automaticamente a mesma jornada. Ao chegar a
+        próxima jornada, o funcionário volta a ver Entrada normalmente.
+      </p>
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="clockManualPunchDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">
+        Registrar marcação
+      </button>
+    </div>
+  </form>
+</dialog>
+<dialog id="clockAdjustmentDialog">
+  <form id="clockAdjustmentForm">
+    <div class="dialog-head">
+      <h3>Solicitar ajuste de ponto</h3>
+      <button type="button" class="icon-btn" data-close="clockAdjustmentDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="clockAdjustmentRecordId" type="hidden" /><label
+        >Marcação que deseja corrigir<select
+          id="clockAdjustmentRecord"
+          required
+        ></select></label
+      ><label
+        >Novo dia e horário<input
+          id="clockAdjustmentDateTime"
+          type="datetime-local"
+          required /></label
+      ><label
+        >Motivo<textarea
+          id="clockAdjustmentReason"
+          required
+          placeholder="Explique o motivo da correção"
+        ></textarea>
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="clockAdjustmentDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Enviar pedido</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="clockDecisionDialog">
+  <form id="clockDecisionForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">REVISÃO DO PONTO</span>
+        <h3>Analisar pedido de ajuste</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="clockDecisionDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="clockDecisionId" type="hidden" />
+      <div class="clock-review-person">
+        <div id="clockDecisionAvatar" class="avatar">—</div>
+        <div>
+          <strong id="clockDecisionEmployee">Funcionário</strong
+          ><span id="clockDecisionType">Marcação</span>
+        </div>
+      </div>
+      <div class="clock-change-grid">
+        <div class="clock-change-box old">
+          <span>Horário registrado</span
+          ><strong id="clockDecisionOriginal">—</strong>
+        </div>
+        <div class="clock-change-arrow">→</div>
+        <div class="clock-change-box new">
+          <span>Horário solicitado</span
+          ><strong id="clockDecisionRequested">—</strong>
+        </div>
+      </div>
+      <label
+        >Horário que será aprovado<input
+          id="clockDecisionApprovedDateTime"
+          type="datetime-local"
+          required
+        /><small>Você pode corrigir o horário antes de aprovar.</small></label
+      >
+      <div class="clock-review-reason">
+        <span>Motivo informado pelo funcionário</span>
+        <p id="clockDecisionReason">—</p>
+      </div>
+      <label
+        >Observação do responsável<textarea
+          id="clockDecisionObservation"
+          placeholder="Opcional. Registre uma orientação ou justificativa."
+        ></textarea>
+      </label>
+    </div>
+    <div class="dialog-actions clock-decision-actions">
+      <button id="clockDecisionReject" type="button" class="btn btn-danger">
+        Rejeitar pedido</button
+      ><button
+        type="button"
+        class="btn btn-secondary"
+        data-close="clockDecisionDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">
+        Aprovar e alterar ponto
+      </button>
+    </div>
+  </form>
+</dialog>
+<dialog id="clockSelfieDialog" class="clock-selfie-dialog">
+  <form id="clockSelfieForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">PONTO SEGURO</span>
+        <h3>Selfie obrigatória</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="clockSelfieDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <div class="clock-selfie-stage">
+        <video id="clockSelfieVideo" autoplay muted playsinline></video>
+        <canvas id="clockSelfieCanvas" class="hidden"></canvas>
+        <div id="clockSelfiePlaceholder" class="clock-selfie-placeholder">
+          <span>◉</span>
+          <strong>Preparando a câmera</strong>
+          <small>Posicione o rosto dentro da área indicada.</small>
+          <button type="button" id="clockSelfieStageFallbackBtn" class="btn btn-sm btn-secondary" style="margin-top: 10px; border-radius: 12px; font-weight: 600; font-size: 12.5px; z-index: 3;">
+            Tirar foto com câmera do celular
+          </button>
+        </div>
+        <span class="clock-selfie-badge">Selfie frontal</span>
+      </div>
+      <input
+        id="clockSelfieFile"
+        class="hidden"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="user"
+      />
+      <div class="clock-proof-list">
+        <div>
+          <i>✓</i
+          ><span
+            ><strong>Foto atual</strong
+            ><small>Tirada agora pela câmera frontal.</small></span
+          >
+        </div>
+        <div>
+          <i>☁</i
+          ><span
+            ><strong>Google Drive privado</strong
+            ><small>A imagem não será salva no Firebase.</small></span
+          >
+        </div>
+        <div>
+          <i>⌖</i
+          ><span
+            ><strong>Localização precisa</strong
+            ><small>Validada somente ao confirmar o ponto.</small></span
+          >
+        </div>
+      </div>
+      <p id="clockSelfieStatus" class="clock-selfie-status" aria-live="polite">
+        Autorize o uso da câmera para continuar.
+      </p>
+    </div>
+    <div class="dialog-actions clock-selfie-actions" id="clockSelfieActions">
+      <button id="clockSelfieCapture" type="button" class="btn btn-secondary">
+        Capturar selfie
+      </button>
+      <div id="clockSelfieConfirmRow" class="clock-selfie-confirm-row hidden">
+        <button
+          id="clockSelfieRetake"
+          type="button"
+          class="btn btn-secondary hidden"
+        >
+          Tirar novamente
+        </button>
+        <button
+          id="clockSelfieConfirm"
+          class="btn btn-primary"
+          type="submit"
+          disabled
+        >
+          Confirmar ponto
+        </button>
+      </div>
+      <button
+        id="clockSelfieNative"
+        type="button"
+        class="btn btn-secondary hidden"
+      >
+        Abrir câmera do celular
+      </button>
+      <button
+        id="clockSelfieContingency"
+        type="button"
+        class="btn btn-ghost hidden"
+      >
+        Câmera indisponível? Bater ponto por contingência
+      </button>
+    </div>
+  </form>
+</dialog>
+<dialog id="holidayDialog">
+  <form id="holidayForm">
+    <div class="dialog-head">
+      <h3 id="holidayDialogTitle">Novo feriado</h3>
+      <button type="button" class="icon-btn" data-close="holidayDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="holidayId" type="hidden" />
+      <div class="dialog-grid">
+        <label>Nome<input id="holidayName" required /></label
+        ><label>Data<input id="holidayDate" type="date" required /></label
+        ><label
+          >Tipo<select id="holidayType">
+            <option>Nacional</option>
+            <option>Regional</option>
+            <option>Municipal</option>
+            <option>Interno da empresa</option>
+            <option>Encerramento da loja</option>
+          </select></label
+        ><label
+          >Loja<select id="holidayStore">
+            <option value="">Todas as lojas</option>
+          </select></label
+        ><label class="switch-label"
+          ><input id="holidayAutoTimeOff" type="checkbox" /> Criar folga
+          automática</label
+        ><label class="switch-label"
+          ><input id="holidayActive" type="checkbox" checked /> Ativo</label
+        ><label class="full"
+          >Observações<textarea id="holidayNotes"></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="holidayDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Guardar feriado</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="accessDialog">
+  <form id="accessForm">
+    <div class="dialog-head">
+      <h3 id="accessDialogTitle">Criar acesso</h3>
+      <button type="button" class="icon-btn" data-close="accessDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="accessId" type="hidden" />
+      <div class="dialog-grid">
+        <label
+          >Funcionário relacionado<select id="accessEmployee">
+            <option value="">Sem vínculo</option>
+          </select></label
+        ><label>Nome<input id="accessName" required /></label
+        ><label>E-mail<input id="accessEmail" type="email" required /></label
+        ><label
+          >Perfil<select id="accessProfile">
+            <option>Funcionário</option>
+            <option>Chefe de cozinha</option>
+            <option>Responsável de loja</option>
+            <option>Administrador</option>
+          </select></label
+        ><label
+          >Loja<select id="accessStore">
+            <option value="">Todas / não aplicável</option>
+          </select></label
+        ><label id="accessPasswordField"
+          ><span id="accessPasswordLabel">Senha inicial</span><input
+            id="accessPassword"
+            type="password"
+            minlength="10"
+            placeholder="Mínimo 10 caracteres" /></label
+        ><label id="accessResetField" class="switch-label hidden"
+          ><input id="accessSendReset" type="checkbox" /> Enviar link seguro
+          para redefinição de senha</label
+        ><label class="switch-label"
+          ><input id="accessFirstLogin" type="checkbox" checked /> Exigir troca
+          no primeiro acesso</label
+        ><label class="switch-label"
+          ><input id="accessActive" type="checkbox" checked /> Acesso
+          ativo</label
+        >
+      </div>
+      <p class="profile-security-note">
+        A senha provisória deverá ser alterada no primeiro acesso quando essa
+        opção estiver marcada.
+      </p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="accessDialog">
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Guardar acesso</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="confirmDialog">
+  <div class="dialog-head">
+    <h3 id="confirmTitle">Confirmar ação</h3>
+    <button type="button" class="icon-btn" data-close="confirmDialog">✕</button>
+  </div>
+  <div class="dialog-body"><p id="confirmMessage"></p></div>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-secondary" data-close="confirmDialog">
+      Cancelar</button
+    ><button id="confirmActionBtn" class="btn btn-danger">Confirmar</button>
+  </div>
+</dialog>
+<dialog id="profileDialog">
+  <form id="profileForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">MINHA CONTA</span>
+        <h3>Meu perfil</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="profileDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="profileAvatar" type="hidden" value="avatar-00" />
+      <section class="avatar-picker-section profile-avatar-picker-section">
+        <div class="avatar-picker-heading">
+          <div><span class="eyebrow">SEU HERÓI</span><h4>Escolha seu avatar</h4></div>
+          <span class="avatar-picker-hint">Seu personagem em todo o portal</span>
+        </div>
+        <div id="profileAvatarPicker" class="avatar-picker" role="radiogroup" aria-label="Meu avatar"></div>
+      </section>
+      <div class="dialog-grid profile-fields">
+        <label>Nome<input id="profileName" readonly /></label
+        ><label
+          >E-mail<input
+            id="profileEmail"
+            type="email"
+            autocomplete="email"
+            required /></label
+        ><label class="full"
+          >Senha atual<input
+            id="profileCurrentPassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Obrigatória para trocar e-mail ou senha"
+        /></label>
+      </div>
+      <div class="profile-google-card">
+        <div class="profile-google-left">
+          <div class="profile-google-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+          </div>
+          <div class="profile-google-texts">
+            <strong>Login com Conta Google &amp; 2FA (LGPD)</strong>
+            <p id="profileGoogleStatusText">Vincule sua conta Google para entrar com segurança de dois fatores (2FA) e conformidade LGPD.</p>
+          </div>
+        </div>
+        <button type="button" id="profileGoogleActionBtn" class="btn btn-secondary btn-profile-google">
+          <span>Vincular Conta Google</span>
+        </button>
+      </div>
+      <div class="profile-privacy-card" style="background:var(--bg-hover, #f8fafc); border:1px solid var(--border-color, #e2e8f0); border-radius:12px; padding:12px 14px; margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div>
+          <strong style="font-size:13px; color:var(--text-primary, #0f172a); display:block;">Privacidade e Proteção de Dados (LGPD)</strong>
+          <span style="font-size:11.5px; color:var(--text-muted, #64748b);">Consulte a política oficial e seu registro de ciência</span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openPrivacyPolicyDialog()">Ver Política</button>
+      </div>
+      <h4 class="dialog-section-title">Alterar senha</h4>
+      <div class="dialog-grid">
+        <label
+          >Nova senha<input
+            id="profileNewPassword"
+            type="password"
+            minlength="10"
+            autocomplete="new-password"
+            placeholder="Mínimo 10 caracteres" /></label
+        ><label
+          >Confirmar nova senha<input
+            id="profileConfirmPassword"
+            type="password"
+            minlength="10"
+            autocomplete="new-password"
+        /></label>
+      </div>
+      <label class="switch-label profile-password-toggle">
+        <input id="profileShowPasswords" type="checkbox" /> Mostrar senhas
+        digitadas
+      </label>
+      <p class="profile-security-note">
+        A nova senha deve ter pelo menos 10 caracteres. Informe a senha atual
+        para confirmar a alteração.
+      </p>
+      <button
+        id="profileForgotPassword"
+        type="button"
+        class="btn btn-secondary"
+      >
+        Esqueci minha senha atual
+      </button>
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="profileDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Guardar alterações</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Regra operacional: limite diário e equipe mínima -->
+<dialog id="operationalRuleDialog">
+  <form id="operationalRuleForm">
+    <div class="dialog-head">
+      <h3>Regra operacional</h3>
+      <button type="button" class="icon-btn" data-close="operationalRuleDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="operationalRuleId" type="hidden" />
+      <div class="dialog-grid">
+        <label>Loja<select id="operationalRuleStore" required></select></label
+        ><label
+          >Cargo<input
+            id="operationalRuleRole"
+            placeholder="Vazio = toda a loja" /></label
+        ><label
+          >Dia da semana<select id="operationalRuleDay">
+            <option>Todos</option>
+            <option>Domingo</option>
+            <option>Segunda-feira</option>
+            <option>Terça-feira</option>
+            <option>Quarta-feira</option>
+            <option>Quinta-feira</option>
+            <option>Sexta-feira</option>
+            <option>Sábado</option>
+          </select></label
+        ><label
+          >Máximo de folgas no dia<input
+            id="operationalRuleLimit"
+            type="number"
+            min="0"
+            value="1"
+            required /></label
+        ><label
+          >Mínimo trabalhando<input
+            id="operationalRuleMinimum"
+            type="number"
+            min="0"
+            value="1"
+            required /></label
+        ><label
+          >Ao detectar conflito<select id="operationalRuleMode">
+            <option>Bloquear</option>
+            <option>Alertar</option>
+          </select></label
+        ><label class="switch-label"
+          ><input id="operationalRuleActive" type="checkbox" checked /> Regra
+          ativa</label
+        >
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-close="operationalRuleDialog"
+      >
+        Cancelar</button
+      ><button class="btn btn-primary" type="submit">Guardar regra</button>
+    </div>
+  </form>
+</dialog>
+<!-- Ciência do funcionário -->
+<dialog id="swapDialog" class="swap-dialog">
+  <form id="swapForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">NOVA SOLICITAÇÃO</span>
+        <h3>Trocar folga</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="swapDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="swap-dialog-intro">
+        <span>⇄</span>
+        <p>
+          Escolha uma folga aprovada ou uma ocorrência da folga fixa. Quando
+          houver folga fixa, a troca vale somente naquela semana; o dia fixo
+          das semanas seguintes permanece igual.
+        </p>
+      </div>
+      <div class="dialog-grid">
+        <label
+          >Minha folga<select id="swapSourceTimeOff" required></select
+        ></label>
+        <label
+          >Colega da mesma loja<select
+            id="swapDestinationEmployee"
+            required
+          ></select
+        ></label>
+        <label class="full"
+          >Folga do colega na mesma semana<select
+            id="swapDestinationTimeOff"
+            required
+          ></select
+        ></label>
+        <label class="full"
+          >Motivo<textarea
+            id="swapReason"
+            required
+            placeholder="Explique brevemente o motivo da troca"
+          ></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="swapDialog">
+        Cancelar
+      </button>
+      <button class="btn btn-primary" type="submit">Enviar solicitação</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Ciência do funcionário -->
+<dialog id="acknowledgementDialog">
+  <form id="acknowledgementForm">
+    <div class="dialog-head">
+      <h3>Confirmar ciência</h3>
+      <button type="button" class="icon-btn" data-close="acknowledgementDialog">
+        ✕
+      </button>
+    </div>
+    <div class="dialog-body">
+      <input id="acknowledgementTimeOffId" type="hidden" />
+      <p id="acknowledgementText"></p>
+      <label
+        >Observação<textarea
+          id="acknowledgementObservation"
+          placeholder="Opcional"
+        ></textarea>
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button
+        id="requestTimeOffChangeBtn"
+        type="button"
+        class="btn btn-secondary"
+      >
+        Solicitar alteração</button
+      ><button class="btn btn-primary" type="submit">
+        Confirmar que estou ciente
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Ajuste rápido de saídas esquecidas -->
+<dialog id="quickFixPunchDialog" class="quick-fix-dialog" style="max-width: 680px; width: 95vw;">
+  <form id="quickFixPunchForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">PONTO INCOMPLETO</span>
+        <h3>Ajustar saídas esquecidas</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="quickFixPunchDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">
+        Estes colaboradores registraram entrada em dias anteriores mas não bateram a saída final.
+        Confirme o horário da saída para fechar o turno e atualizar o banco de horas.
+      </p>
+      <div id="quickFixPunchList" class="quick-fix-punch-list">
+        <!-- Renderizado dinamicamente -->
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="quickFixPunchDialog">Fechar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Fechamento / Conversão de Banco de Horas -->
+<dialog id="settleHourBalanceDialog" style="max-width: 540px; width: 95vw;">
+  <form id="settleHourBalanceForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">BANCO DE HORAS</span>
+        <h3>Fechar Mês / Quitar Banco</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="settleHourBalanceDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-grid">
+        <label>Competência (Mês)
+          <input id="settleMonth" type="month" required />
+        </label>
+        <label>Funcionário
+          <select id="settleEmployee" required></select>
+        </label>
+        <div class="full" style="background:var(--surface2, rgba(255,255,255,0.05));border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);">
+          <div>
+            <span style="font-size:12px;color:var(--muted);display:block">Saldo apurado no mês</span>
+            <strong id="settleCurrentBalance" style="font-size:18px;color:#20a06b">+0h 00min</strong>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:12px;color:var(--muted);display:block">Carga diária contratual</span>
+            <strong id="settleDailyWorkload" style="font-size:14px">7h 20min</strong>
+          </div>
+        </div>
+        <label class="full">Ação desejada
+          <select id="settleMode" required>
+            <option value="converter_folga">Converter em Folgas Compensatórias</option>
+            <option value="quitar_folha">Quitar / Pagar Horas Extras em Folha</option>
+          </select>
+        </label>
+        <label id="settleLeaveCountField">Folgas a creditar
+          <input id="settleLeaveCount" type="number" step="0.5" min="0.5" value="1" />
+        </label>
+        <label id="settleMinutesField">Minutos a abater do banco
+          <input id="settleMinutes" type="number" step="1" min="1" value="440" required />
+        </label>
+        <label class="full">Motivo / Observação
+          <input id="settleReason" type="text" placeholder="Ex: Acordo de compensação / Quitação em folha" />
+        </label>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="settleHourBalanceDialog">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Confirmar Fechamento</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Compartilhar Escala no WhatsApp -->
+<dialog id="whatsappScheduleDialog" style="max-width: 600px; width: 95vw;">
+  <div class="dialog-head">
+    <div>
+      <span class="eyebrow">COMUNICAÇÃO DA EQUIPE</span>
+      <h3>Escala Semanal para WhatsApp</h3>
+    </div>
+    <button type="button" class="icon-btn" data-close="whatsappScheduleDialog">✕</button>
+  </div>
+  <div class="dialog-body">
+    <div class="dialog-grid" style="margin-bottom: 12px;">
+      <label>Loja
+        <select id="whatsappScheduleStore"></select>
+      </label>
+      <label>Data de Início da Semana
+        <input id="whatsappScheduleStartDate" type="date" />
+      </label>
+    </div>
+    <label class="full" style="margin-bottom: 8px;">Mensagem formatada
+      <textarea id="whatsappScheduleText" rows="12" style="font-family: monospace; font-size: 13px; line-height: 1.45; white-space: pre-wrap;" readonly></textarea>
+    </label>
+  </div>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-secondary" data-close="whatsappScheduleDialog">Fechar</button>
+    <button type="button" id="copyWhatsAppScheduleBtn" class="btn btn-secondary"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px;">content_copy</span>Copiar Mensagem</button>
+    <button type="button" id="sendWhatsAppScheduleBtn" class="btn btn-primary" style="background:#25D366; border-color:#25D366; color:#09090b; font-weight:700"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px;">chat</span>Abrir no WhatsApp</button>
+  </div>
+</dialog>
+
+<!-- Zerar Saldos da Loja (Administrador) -->
+<dialog id="resetStoreBalancesDialog" style="max-width: 540px; width: 95vw;">
+  <form id="resetStoreBalancesForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">ADMINISTRAÇÃO</span>
+        <h3>Zerar Saldos da Loja</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="resetStoreBalancesDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-grid">
+        <label class="full">Selecione a Loja
+          <select id="resetStoreSelect" required></select>
+        </label>
+        <label class="full">Qual saldo deseja zerar?
+          <select id="resetBalanceMode" required>
+            <option value="ambos">Ambos (Banco de Horas e Saldo de Folgas)</option>
+            <option value="banco_horas">Apenas Banco de Horas</option>
+            <option value="saldo_folgas">Apenas Saldo de Folgas</option>
+          </select>
+        </label>
+        <div class="full" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px;">
+          <strong style="color:#ef4444;font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="material-symbols-rounded" style="font-size:16px;">warning</span> Atenção: Ação Administrativa</strong>
+          <span style="font-size:12px;color:var(--text, #333)">Esta operação irá calcular e zerar o saldo de todos os colaboradores ativos da loja selecionada, gravando a compensação e o histórico em auditoria.</span>
+        </div>
+        <label class="full">Motivo / Justificativa
+          <input id="resetStoreReason" type="text" placeholder="Ex: Fechamento de período / Acordo de compensação" required minlength="4" />
+        </label>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="resetStoreBalancesDialog">Cancelar</button>
+      <button class="btn btn-danger" type="submit" style="background:#dc2626;color:#fff;border:none">Confirmar e Zerar Saldos</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- DIALOG: Nova / Editar Tarefa -->
+<dialog id="taskDialog">
+  <form id="taskForm">
+    <input type="hidden" id="taskIdInput" value="" />
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow">OPERAÇÃO &amp; CHECKLIST</span>
+        <h3 id="taskDialogHeading">Nova Tarefa / Checklist</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="taskDialog" aria-label="Fechar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-grid">
+        <label class="full">Título da Tarefa *
+          <input id="taskTitleInput" type="text" placeholder="Ex: Higienização da chapa morna e gaveta" required />
+        </label>
+        <label>Setor
+          <select id="taskSectorInput">
+            <option value="Caixa">Caixa</option>
+            <option value="Cozinha">Cozinha</option>
+            <option value="Chapa">Chapa</option>
+            <option value="Salão">Salão</option>
+            <option value="Delivery">Delivery</option>
+            <option value="Geral">Geral</option>
+          </select>
+        </label>
+        <label>Prioridade
+          <select id="taskPriorityInput">
+            <option value="Media" selected>Média</option>
+            <option value="Alta">Alta</option>
+            <option value="Urgente">Urgente</option>
+            <option value="Baixa">Baixa</option>
+          </select>
+        </label>
+        <label>Responsável
+          <select id="taskEmployeeInput">
+            <option value="">Equipe da Praça (Geral)</option>
+          </select>
+        </label>
+        <label>Hora Limite (opcional)
+          <input id="taskDeadlineInput" type="time" />
+        </label>
+        <label class="full">Orientações / Detalhes
+          <textarea id="taskDescInput" rows="2" placeholder="Instruções claras para a equipe executar..."></textarea>
+        </label>
+        <label class="switch-label full">
+          <input id="taskManagerSignInput" type="checkbox" /> Exigir visto / aprovação do Gerente para conclusão
+        </label>
+        <div class="full" style="border-top: 1px solid var(--line, #e2e8f0); padding-top: 14px; margin-top: 6px;">
+          <strong style="font-size: 13px; display: block; margin-bottom: 8px;">Subitens do Checklist (passo a passo)</strong>
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <input id="taskChecklistNewInput" type="text" placeholder="Ex: Conferir bobina e troco" style="flex: 1;" />
+            <button type="button" id="taskChecklistAddBtn" class="btn btn-secondary">+ Adicionar</button>
+          </div>
+          <div id="taskChecklistDraftContainer" class="draft-checklist-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="taskDialog">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Salvar Tarefa</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- DIALOG: Gerar Rotina do Turno -->
+<dialog id="taskRoutineDialog">
+  <div class="dialog-head">
+    <div>
+      <span class="eyebrow">AUTOMAÇÃO DO TURNO</span>
+      <h3>Disparar Rotina Padrão</h3>
+    </div>
+    <button type="button" class="icon-btn" data-close="taskRoutineDialog" aria-label="Fechar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="dialog-body">
+    <p style="font-size: 14px; color: var(--text-muted, #64748b); margin-top: 0; margin-bottom: 16px;">
+      Escolha qual pacote de checklists operacionais você deseja gerar para o turno de hoje:
+    </p>
+    <div class="routine-picker-cards">
+      <div class="routine-card" data-trigger-routine="caixa">
+        <span class="routine-card-tag tag-caixa">CAIXA</span>
+        <div class="routine-card-info">
+          <h4>Rotina Operacional do Caixa</h4>
+          <p>Abertura do PDV, conferência de sistemas (Takeat, iFood, WhatsApp), lançamento de notas e Drive, grupo VIP, status e pendências.</p>
+          <span class="routine-badge-count">8 tarefas com checklists operacionais</span>
+        </div>
+      </div>
+      <div class="routine-card" data-trigger-routine="abertura">
+        <span class="routine-card-tag tag-abertura">ABERTURA</span>
+        <div class="routine-card-info">
+          <h4>Abertura de Turno</h4>
+          <p>Conferência de estoque crítico, temperatura de freezers, pré-aquecimento de chapas/fritadeiras e gaveta de caixa.</p>
+          <span class="routine-badge-count">4 tarefas com checklists automáticos</span>
+        </div>
+      </div>
+      <div class="routine-card" data-trigger-routine="fechamento">
+        <span class="routine-card-tag tag-fechamento">FECHAMENTO</span>
+        <div class="routine-card-info">
+          <h4>Fechamento de Turno</h4>
+          <p>Limpeza de coifa/chapa, desligamento de gás, descarte ecológico de óleo, fechamento financeiro e lixo/salão.</p>
+          <span class="routine-badge-count">5 tarefas com checklists automáticos</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-secondary" data-close="taskRoutineDialog">Fechar</button>
+  </div>
+</dialog>
+
+<!-- DIALOG: Chamado de Manutenção -->
+<dialog id="taskMaintenanceDialog">
+  <form id="taskMaintenanceForm">
+    <div class="dialog-head">
+      <div>
+        <span class="eyebrow" style="color: #ef4444;">MANUTENÇÃO &amp; REPAROS</span>
+        <h3>Relatar Equipamento com Defeito</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="taskMaintenanceDialog" aria-label="Fechar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-grid">
+        <label class="full">Equipamento *
+          <select id="taskMaintenanceEquipment" required>
+            <option value="Chapa Principal">Chapa Principal</option>
+            <option value="Fritadeira Elétrica/Gás">Fritadeira Elétrica / Gás</option>
+            <option value="Freezer ou Câmara Fria">Freezer ou Câmara Fria</option>
+            <option value="Ar-condicionado do Salão">Ar-condicionado do Salão</option>
+            <option value="Coifa / Sistema de Exaustão">Coifa / Sistema de Exaustão</option>
+            <option value="Computador / Tablet / PDV">Computador / Tablet / PDV</option>
+            <option value="Bag de Motoboy / Bag Térmica">Bag de Motoboy / Bag Térmica</option>
+            <option value="Instalação Elétrica / Iluminação">Instalação Elétrica / Iluminação</option>
+            <option value="Outro Equipamento">Outro Equipamento</option>
+          </select>
+        </label>
+        <label class="full">O que está acontecendo? *
+          <textarea id="taskMaintenanceDesc" rows="3" placeholder="Ex: Fritadeira 2 está desarmando o termostato ao atingir 180°C..." required></textarea>
+        </label>
+        <label>Urgência
+          <select id="taskMaintenancePriority">
+            <option value="Alta" selected>Alta (atrapalha a produção)</option>
+            <option value="Urgente">Urgente (impede a operação)</option>
+            <option value="Media">Média (pode aguardar término do turno)</option>
+          </select>
+        </label>
+        <label>Setor Afetado
+          <select id="taskMaintenanceSector">
+            <option value="Cozinha">Cozinha</option>
+            <option value="Chapa">Chapa</option>
+            <option value="Caixa">Caixa</option>
+            <option value="Salão">Salão</option>
+            <option value="Delivery">Delivery</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close="taskMaintenanceDialog">Cancelar</button>
+      <button class="btn btn-primary" type="submit" style="background:#dc2626;border-color:#dc2626;">Registrar Chamado</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- DIALOG: Detalhes da Tarefa e Checklist Completo -->
+<dialog id="taskDetailDialog" class="task-detail-dialog">
+  <div class="dialog-head">
+    <div>
+      <span class="eyebrow" id="taskDetailEyebrow">DETALHES DA TAREFA</span>
+      <h3 id="taskDetailTitle">Título da Tarefa</h3>
+    </div>
+    <button type="button" class="icon-btn" data-close="taskDetailDialog" aria-label="Fechar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="dialog-body">
+    <div class="task-detail-meta-row">
+      <span class="badge" id="taskDetailSectorBadge">Caixa</span>
+      <span class="badge" id="taskDetailPriorityBadge">Média</span>
+      <span class="badge" id="taskDetailColumnBadge">Pendente</span>
+      <span id="taskDetailDeadlineBadge" class="task-detail-time"></span>
+    </div>
+
+    <div id="taskDetailDescWrap" class="task-detail-section" style="margin-top: 12px;">
+      <p id="taskDetailDesc" class="task-detail-desc"></p>
+    </div>
+
+    <div class="task-detail-section" style="margin-top: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <strong style="font-size: 13px; color: var(--text, #0f172a);">Checklist Operacional</strong>
+        <span id="taskDetailChecklistProgress" style="font-size: 12px; font-weight: 700; color: var(--muted, #64748b);">0/0 (0%)</span>
+      </div>
+      <div class="task-detail-progress-track">
+        <div id="taskDetailProgressBar" class="task-detail-progress-bar" style="width: 0%;"></div>
+      </div>
+      <div id="taskDetailChecklistContainer" class="task-detail-checklist-list"></div>
+    </div>
+
+    <div id="taskDetailVistoSection" class="task-detail-visto-box" style="display: none; margin-top: 14px;">
+      <div style="font-size: 12px; color: #047857; font-weight: 600;">Visto do Gerente concedido</div>
+      <div id="taskDetailVistoInfo" style="font-size: 11.5px; color: #065f46; margin-top: 2px;"></div>
+    </div>
+
+    <div class="task-detail-info-grid" style="margin-top: 16px;">
+      <div>
+        <small style="color: var(--muted, #64748b); display: block;">Responsável</small>
+        <strong id="taskDetailAssignee" style="font-size: 13px; color: var(--text, #1e293b);">Equipe da Praça</strong>
+      </div>
+      <div>
+        <small style="color: var(--muted, #64748b); display: block;">Loja &amp; Data</small>
+        <strong id="taskDetailStoreDate" style="font-size: 13px; color: var(--text, #1e293b);">—</strong>
+      </div>
+    </div>
+  </div>
+  <div class="dialog-actions task-detail-actions">
+    <div style="display: flex; gap: 8px; flex: 1;">
+      <button type="button" class="btn btn-secondary" id="taskDetailEditBtn">Editar</button>
+      <button type="button" class="btn btn-danger-ghost" id="taskDetailDeleteBtn">Excluir</button>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="btn btn-secondary" id="taskDetailMoveBtn">Mover Etapa</button>
+      <button type="button" class="btn btn-primary" id="taskDetailApproveBtn" style="display: none;">Conceder Visto</button>
+      <button type="button" class="btn btn-secondary" data-close="taskDetailDialog">Fechar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="takeatMappingDialog">
+  <form id="takeatMappingForm">
+    <div class="dialog-head">
+      <h3 id="takeatMappingDialogTitle">Vincular Conta Takeat</h3>
+      <button type="button" class="icon-btn" data-close="takeatMappingDialog">✕</button>
+    </div>
+    <div class="dialog-body">
+      <input id="takeatMappingAccountKey" type="hidden" />
+      <div class="dialog-grid">
+        <label class="full">
+          Conta na Takeat
+          <input id="takeatMappingAccountName" type="text" readonly style="font-weight:bold; background:var(--surface-sunken, #f8fafc);" />
+        </label>
+        <label class="full">
+          Colaborador no Gestão de Folgas 3.0
+          <select id="takeatMappingEmployeeSelect" required style="width:100%;">
+            <option value="">-- Selecione o colaborador --</option>
+            <option value="ignored">🚫 Desconsiderar conta (Despesa Operacional / Outros)</option>
+            <optgroup label="Colaboradores Cadastrados" id="takeatMappingEmployeeOptgroup">
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      <p style="font-size:12px; color:var(--text-muted, #64748b); margin-top:0.75rem;">
+        💡 Ao salvar, o vínculo fica gravado no sistema e o débito deste colaborador será reconhecido automaticamente em todas as telas e no fechamento mensal.
+      </p>
+    </div>
+    <div class="dialog-foot">
+      <button type="button" class="btn btn-ghost" id="takeatMappingClearBtn" style="margin-right:auto; color:#ef4444;">
+        Remover vínculo manual
+      </button>
+      <button type="button" class="btn btn-secondary" data-close="takeatMappingDialog">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Salvar Vínculo</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal de Detalhes da Comanda / Olho Minimalista -->
+<dialog id="takeatComandaDetailsDialog" style="max-width:480px; width:92vw; border-radius:16px; padding:0; border:1px solid var(--border-color, #e2e8f0); box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); background:var(--bg-card, #ffffff);">
+  <div class="dialog-head" style="padding:1.15rem 1.25rem; border-bottom:1px solid var(--border-color, #e2e8f0); display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted, #64748b); letter-spacing:0.04em;" id="takeatComandaDialogSubtitle">TAKEAT · COMANDA</div>
+      <h3 id="takeatComandaDialogTitle" style="margin:0; font-size:18px; color:var(--text-primary, #0f172a); font-weight:700;">Itens da Comanda</h3>
+    </div>
+    <button type="button" class="icon-btn" data-close="takeatComandaDetailsDialog" style="background:transparent; border:none; font-size:18px; cursor:pointer; color:var(--text-muted, #64748b); padding:4px 8px; border-radius:6px;">✕</button>
+  </div>
+  <div class="dialog-body" id="takeatComandaDialogBody" style="padding:1.25rem; max-height:68vh; overflow-y:auto;">
+    <div style="text-align:center; padding:2rem; color:var(--text-muted, #64748b);">Carregando itens da comanda…</div>
+  </div>
+  <div class="dialog-foot" style="padding:0.9rem 1.25rem; border-top:1px solid var(--border-color, #e2e8f0); display:flex; justify-content:space-between; align-items:center; background:var(--bg-card-alt, #f8fafc); border-bottom-left-radius:16px; border-bottom-right-radius:16px;">
+    <div id="takeatComandaDialogFooterInfo" style="font-size:12px; color:var(--text-muted, #64748b);"></div>
+    <button type="button" class="btn btn-secondary" data-close="takeatComandaDetailsDialog" style="padding:6px 16px; border-radius:8px; font-size:13px;">Fechar</button>
+  </div>
+</dialog>
+
+<!-- Modal de Leitura Obrigatória e Assinatura Eletrônica -->
+<dialog id="documentSignDialog" class="document-modal"></dialog>
+
+<!-- Modal de Emissão e Upload de Novo Documento -->
+<dialog id="documentUploadDialog" class="document-modal"></dialog>
+
+<!-- Modal de Envio de Atestado Médico com Abono de Faltas -->
+<dialog id="medicalCertificateDialog" class="document-modal" style="max-width: 580px; width: 94vw;"></dialog>
+
+<!-- Modal de Conferência e Importação de Holerites em Lote -->
+<dialog id="documentBatchConfirmDialog" class="document-modal" style="max-width: 1020px; width: 96vw;"></dialog>
+
+<!-- Modal de Visualização Rápida de Página Individual do Lote -->
+<dialog id="documentBatchPreviewDialog" class="document-modal" style="max-width: 840px; width: 92vw;"></dialog>
+
+<!-- Modal de Visualização de Documentos em Alta Resolução -->
+<dialog id="documentPreviewDialog" class="document-modal" style="max-width: 880px; width: 94vw;"></dialog>
+
+<!-- Modal de Comprovante de Registro de Ponto do Trabalhador (Portaria MTE 671) -->
+<dialog id="clockReceiptDialog" class="clock-receipt-dialog" style="max-width: 520px; width: 92vw; border-radius: 16px; padding: 24px; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 12px;">
+    <div>
+      <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; color: var(--text-muted, #64748b);">Portaria MTE nº 671/2021</span>
+      <h3 style="margin: 4px 0 0; font-size: 17px; font-weight: 700; color: var(--text-primary, #0f172a);">Comprovante de Registro de Ponto</h3>
+    </div>
+    <button type="button" class="btn-ghost btn-sm" onclick="closeDialog('clockReceiptDialog')" style="font-size: 18px; line-height: 1; padding: 4px 8px; border: none; background: transparent; cursor: pointer; color: var(--text-muted, #64748b);">✕</button>
+  </div>
+  <div id="clockReceiptContent" style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; color: var(--text-secondary, #334155);">
+    <!-- Conteúdo preenchido dinamicamente via showTimeClockReceipt_ -->
+  </div>
+  <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-color, #e2e8f0); display: flex; justify-content: flex-end; gap: 8px;">
+    <button type="button" class="btn btn-secondary" onclick="closeDialog('clockReceiptDialog')">Fechar</button>
+    <button type="button" class="btn btn-primary" onclick="printClockReceipt_()">Imprimir comprovante</button>
+  </div>
+</dialog>
+
+<!-- Modal Oficial de Política de Privacidade e Proteção de Dados Pessoais (LGPD) -->
+<dialog id="privacyPolicyDialog" class="privacy-policy-dialog" style="max-width: 860px; width: 95vw; border-radius: 18px; padding: 0; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
+  <div style="flex: none; display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 18px; border-bottom: 1px solid var(--border-color, #e2e8f0); background: var(--bg-hover, #f8fafc); gap: 10px;">
+    <div>
+      <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; color: var(--primary, #6340d8);">Conformidade LGPD · Lei nº 13.709/2018</span>
+      <h3 style="margin: 2px 0 0; font-size: 16px; font-weight: 700; color: var(--text-primary, #0f172a);">Política de Privacidade e Proteção de Dados Pessoais</h3>
+      <small style="color: var(--text-muted, #64748b); font-size: 11px;">Grupo House 190 · Gestão de Folgas 3.0 · Versão 1.0 (Vigência: Outubro de 2026)</small>
+    </div>
+    <button type="button" class="btn-ghost btn-sm" onclick="closeDialog('privacyPolicyDialog')" style="flex: none; font-size: 18px; line-height: 1; padding: 6px 10px; border: none; background: transparent; cursor: pointer; color: var(--text-muted, #64748b);">✕</button>
+  </div>
+  <div id="privacyPolicyDialogBody" style="flex: 1; min-height: 0; padding: 18px 18px; overflow-y: auto; font-size: 13px; line-height: 1.65; color: var(--text-secondary, #334155); scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
+    <div style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-size: 12.5px;">
+      <strong>Grupo House 190 — Gestão de Folgas 3.0</strong><br>
+      <strong>Controladora(s):</strong> Empresas do Grupo House 190 (House Burger Teixeira, House Burger Eunápolis, House Foodpark)<br>
+      <strong>Canal Oficial de Privacidade:</strong> privacidade@grupohouse190.com.br (e Recursos Humanos)
+    </div>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">1. APRESENTAÇÃO E OBJETIVO</h4>
+    <p>O Grupo House 190, por meio das empresas responsáveis pelas respectivas relações de trabalho, estabelece esta Política de Privacidade e Proteção de Dados Pessoais para orientar o tratamento das informações dos colaboradores que utilizam o sistema Gestão de Folgas 3.0.</p>
+    <p>O sistema é uma plataforma interna de organização operacional e gestão de equipes, destinada ao acompanhamento de jornadas, registros de ponto, folgas, escalas, banco de horas, documentos, solicitações, comunicações e demais atividades profissionais.</p>
+    <p>Esta Política tem como objetivos:</p>
+    <ul style="margin: 6px 0 12px 20px; padding: 0;">
+      <li>Informar quais dados pessoais são tratados e para quais finalidades.</li>
+      <li>Estabelecer critérios de utilização, segurança, acesso e armazenamento.</li>
+      <li>Garantir transparência sobre as funcionalidades de monitoramento e controle de jornada.</li>
+      <li>Proteger a privacidade e os direitos dos colaboradores.</li>
+      <li>Estabelecer procedimentos de registro de ciência da Política.</li>
+      <li>Promover a conformidade com a Lei Geral de Proteção de Dados Pessoais — LGPD (Lei nº 13.709/2018) e demais normas aplicáveis.</li>
+    </ul>
+    <p>A presente Política aplica-se aos colaboradores, gestores, administradores e demais usuários autorizados do sistema, respeitadas as particularidades de cada vínculo profissional.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">2. IDENTIFICAÇÃO DOS RESPONSÁVEIS PELOS DADOS</h4>
+    <p>Cada empresa empregadora integrante do Grupo House 190 será identificada como controladora dos dados pessoais relacionados aos seus respectivos colaboradores, conforme sua atuação efetiva e as decisões sobre o tratamento.</p>
+    <p>Quando houver compartilhamento ou gestão centralizada de dados entre empresas do grupo, deverão ser observadas as responsabilidades de cada participante e a necessidade desse compartilhamento.</p>
+    <p>Os prestadores de serviços tecnológicos poderão atuar como operadores ou controladores independentes, conforme suas responsabilidades contratuais e a natureza do serviço.</p>
+    <p>O colaborador poderá solicitar informações sobre a empresa responsável pelo tratamento de seus dados pelo canal de privacidade indicado nesta Política.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">3. DADOS PESSOAIS TRATADOS</h4>
+    <p>Conforme as funcionalidades utilizadas e o perfil de acesso, o sistema poderá tratar as seguintes categorias de informações:</p>
+    <p><strong>3.1. Dados de identificação e cadastro:</strong> Nome completo, CPF, telefone, e-mail, unidade de trabalho, cargo, função, data de admissão, tipo de contrato, situação cadastral, jornada contratual e identificadores internos.</p>
+    <p><strong>3.2. Dados de autenticação e acesso:</strong> Identificador de usuário, e-mail de acesso, informações de autenticação fornecidas pelo serviço responsável, datas e horários de acesso, registros de sessão, identificadores de dispositivo e informações técnicas de segurança, conforme a configuração efetivamente adotada. As senhas não deverão ser armazenadas em texto legível nos cadastros operacionais do sistema.</p>
+    <p><strong>3.3. Dados de jornada e ponto eletrônico:</strong> Datas e horários de entrada, saída, intervalos, retornos, carga horária prevista, horas trabalhadas, faltas, atrasos, saídas antecipadas, divergências, solicitações de correção, ajustes e histórico das alterações.</p>
+    <p><strong>3.4. Dados de escalas, folgas e banco de horas:</strong> Folgas previstas e realizadas, solicitações, trocas, aprovações, recusas, justificativas, compensações, saldos positivos e negativos, fechamentos de períodos e histórico das decisões administrativas.</p>
+    <p><strong>3.5. Imagens, selfies e localização:</strong> Quando utilizadas as funcionalidades correspondentes, poderão ser tratados registros fotográficos e dados de localização necessários à validação do registro de ponto, à identificação do responsável pela marcação e à verificação da unidade de trabalho.</p>
+    <p><strong>3.6. Dados de saúde e justificativas de ausência:</strong> Quando necessário à administração de afastamentos e ao cumprimento de obrigações legais, poderão ser tratados atestados médicos, períodos de afastamento e outras informações indispensáveis à análise das justificativas. Dados de saúde são considerados sensíveis e exigem proteção reforçada.</p>
+    <p><strong>3.7. Documentos profissionais:</strong> Contratos, termos, holerites, comprovantes, declarações, registros de assinatura eletrônica e documentos relacionados à relação profissional, quando disponibilizados no portal.</p>
+    <p><strong>3.8. Atividades operacionais:</strong> Tarefas designadas, checklists, confirmações de execução, registros fotográficos de atividades, manifestações de ciência, justificativas e aprovações de gestores.</p>
+    <p><strong>3.9. Comunicações internas e benefícios:</strong> Confirmações de leitura, avisos, respostas a enquetes, participação em programas internos, recompensas, pontuações e informações de consumo ou valores quando houver integração autorizada com sistemas de gestão comercial.</p>
+    <p>Serão coletados apenas os dados necessários às finalidades legítimas e informadas.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">4. FINALIDADES DO TRATAMENTO</h4>
+    <p>Os dados pessoais serão tratados para:</p>
+    <ul style="margin: 6px 0 12px 20px; padding: 0;">
+      <li>Administrar a relação de trabalho e os cadastros profissionais.</li>
+      <li>Registrar e acompanhar a jornada de trabalho.</li>
+      <li>Elaborar escalas e organizar folgas.</li>
+      <li>Calcular e conferir saldos do banco de horas.</li>
+      <li>Gerenciar faltas, afastamentos e justificativas.</li>
+      <li>Receber e analisar solicitações dos colaboradores.</li>
+      <li>Fornecer acesso individualizado a informações profissionais.</li>
+      <li>Organizar tarefas e acompanhar a execução de atividades.</li>
+      <li>Administrar documentos e comprovantes.</li>
+      <li>Proteger o sistema contra acessos não autorizados e fraudes.</li>
+      <li>Investigar inconsistências e manter trilhas de auditoria.</li>
+      <li>Cumprir obrigações legais, regulatórias e contratuais.</li>
+      <li>Exercer regularmente direitos em processos administrativos ou judiciais.</li>
+      <li>Administrar programas internos de benefícios e reconhecimento, conforme regras próprias.</li>
+      <li>Produzir relatórios necessários à gestão de pessoal, respeitando critérios de proporcionalidade e acesso restrito.</li>
+    </ul>
+    <p>É proibida a reutilização incompatível dos dados para finalidades não informadas ou não amparadas pela legislação.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">5. BASES LEGAIS</h4>
+    <p>O tratamento dos dados pessoais observará as hipóteses legais previstas nos artigos 7º e 11 da LGPD, conforme a categoria dos dados e a finalidade específica:</p>
+    <ul style="margin: 6px 0 12px 20px; padding: 0;">
+      <li><strong>Cumprimento de obrigação legal ou regulatória:</strong> registro de jornada, documentos trabalhistas e demais obrigações previstas na legislação.</li>
+      <li><strong>Execução contratual:</strong> administração de informações necessárias ao cumprimento da relação contratual, observados os requisitos legais.</li>
+      <li><strong>Exercício regular de direitos:</strong> conservação e utilização de registros necessários à comprovação de direitos e obrigações.</li>
+      <li><strong>Legítimo interesse:</strong> determinadas atividades proporcionais de segurança, prevenção de fraudes e administração operacional, após avaliação dos direitos e expectativas legítimas dos titulares, sem utilização dessa base para dados pessoais sensíveis.</li>
+      <li><strong>Consentimento:</strong> exclusivamente quando for a base legal adequada e houver possibilidade efetiva de manifestação livre, informada e inequívoca.</li>
+    </ul>
+    <p>A ciência desta Política não constitui autorização genérica para qualquer tratamento de dados pessoais. Tratamentos opcionais que dependam de consentimento terão manifestação específica e possibilidade de revogação, conforme a legislação.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">6. REGISTRO ELETRÔNICO DE PONTO</h4>
+    <p>O sistema poderá ser utilizado para registrar entradas, saídas, intervalos e demais eventos relativos à jornada dos colaboradores. Cada marcação deverá representar o horário efetivamente realizado pelo trabalhador, observadas as regras legais aplicáveis. As marcações e os ajustes deverão possuir mecanismos de rastreabilidade. Em caso de esquecimento, erro ou divergência, o colaborador poderá solicitar correção por meio dos procedimentos disponibilizados pela empresa. Os ajustes administrativos deverão identificar o responsável, a data, a justificativa e os dados alterados, preservando o histórico necessário. A utilização do sistema não dispensa a empresa do cumprimento da legislação trabalhista e dos requisitos técnicos aplicáveis ao registro eletrônico de ponto.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">7. UTILIZAÇÃO DE CÂMERA E SELFIE</h4>
+    <p>A funcionalidade de captura de selfie poderá ser utilizada no momento da marcação de ponto para auxiliar a conferência da identidade do colaborador e a prevenção de registros realizados por terceiros. A coleta deve ser limitada às ocasiões necessárias à finalidade informada. As imagens deverão ser protegidas contra acesso não autorizado, utilização indevida e compartilhamento incompatível com sua finalidade. O acesso deverá ficar restrito aos profissionais autorizados que necessitem da informação para executar suas atribuições. As imagens não deverão ser utilizadas para divulgação publicitária, redes sociais ou outras finalidades incompatíveis com o registro de jornada. O uso de tecnologias de reconhecimento facial ou identificação biométrica, caso venha a existir, dependerá de avaliação específica de necessidade, proporcionalidade, segurança e hipótese legal para tratamento de dados sensíveis. A simples captura de fotografia não significa necessariamente que o sistema realize reconhecimento biométrico. A empresa deverá disponibilizar procedimento alternativo para situações de impossibilidade técnica, falha da câmera, acessibilidade ou outras circunstâncias justificadas.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">8. UTILIZAÇÃO DE LOCALIZAÇÃO</h4>
+    <p>O sistema poderá solicitar acesso à localização do dispositivo no momento da marcação de ponto, para verificar a compatibilidade do registro com o local de trabalho autorizado. A localização deverá ser utilizada somente para finalidades relacionadas à validação do registro e à segurança da operação. A coleta deverá respeitar os princípios da necessidade, adequação e minimização de dados. O sistema não deverá realizar rastreamento contínuo da localização pessoal do colaborador fora das situações expressamente informadas e juridicamente justificadas. Os dados efetivamente armazenados, sua precisão e seus prazos de retenção deverão ser documentados. A concessão de permissão técnica de localização pelo dispositivo não representa, por si só, consentimento para outras finalidades. Falhas de GPS e situações excepcionais deverão ser analisadas por procedimento apropriado, sem presumir automaticamente irregularidade praticada pelo colaborador.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">9. ESCALAS, FOLGAS E TROCAS</h4>
+    <p>O sistema poderá registrar escalas, folgas fixas e variáveis, solicitações de alteração, trocas entre colaboradores e decisões dos gestores. As informações serão utilizadas para organizar o funcionamento das unidades, acompanhar solicitações e documentar as decisões. A confirmação de recebimento de uma escala ou de uma alteração não será interpretada, isoladamente, como renúncia a direitos trabalhistas. As folgas, os intervalos e as compensações deverão observar a legislação aplicável, os instrumentos coletivos e os acordos válidos. Toda alteração administrativa relevante deverá manter histórico para consulta e conferência.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">10. BANCO DE HORAS E COMPENSAÇÕES</h4>
+    <p>O sistema poderá calcular, apresentar e registrar horas trabalhadas, horas previstas, créditos, débitos, ajustes, compensações e fechamentos de períodos. Os cálculos têm finalidade de acompanhamento e administração da jornada. Qualquer compensação ou regime de banco de horas deverá observar os requisitos legais e os acordos aplicáveis. A consulta ou ciência dos saldos apresentados não constitui concordância definitiva com os cálculos, quitação de valores ou renúncia ao direito de solicitar revisão. O colaborador poderá comunicar inconsistências à administração, que deverá disponibilizar procedimento para análise e resposta. Os registros originais e as alterações relevantes deverão ser preservados conforme as exigências legais e técnicas aplicáveis.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">11. ATESTADOS MÉDICOS E DADOS SENSÍVEIS</h4>
+    <p>Informações relacionadas à saúde serão tratadas somente quando necessárias para analisar afastamentos, justificar ausências ou cumprir obrigações legalmente estabelecidas. A empresa deverá restringir o acesso a esses documentos aos profissionais expressamente autorizados. Diagnósticos, códigos de doenças e demais informações clínicas não deverão ser exigidos ou divulgados indiscriminadamente. O tratamento respeitará as hipóteses legais específicas aplicáveis aos dados sensíveis. Os documentos deverão ser armazenados de maneira protegida, com regras específicas de acesso e retenção. Gestores operacionais deverão receber, preferencialmente, apenas as informações administrativas necessárias à organização da jornada e das escalas.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">12. DOCUMENTOS, HOLERITES E ASSINATURAS</h4>
+    <p>O sistema poderá disponibilizar documentos profissionais para consulta e assinatura eletrônica. Cada assinatura ou confirmação deverá estar associada ao documento correspondente, ao usuário autenticado, à data e hora do evento e aos registros técnicos necessários à rastreabilidade. O método de assinatura deverá ser compatível com a natureza do documento e seus requisitos legais. A confirmação de ciência de documento informativo não deverá ser confundida com assinatura de acordo trabalhista, reconhecimento de dívida, quitação de valores ou alteração contratual. Cada documento que exija manifestação específica deverá possuir apresentação e confirmação próprias.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">13. TAREFAS, CHECKLISTS E ATIVIDADES OPERACIONAIS</h4>
+    <p>O sistema poderá registrar responsáveis por tarefas, horários, orientações, confirmações, fotografias comprobatórias e aprovações de gestores. Esses dados serão utilizados para organizar a operação, comprovar a execução de atividades e identificar pendências. As informações não deverão ser utilizadas para exposição vexatória, tratamento discriminatório ou finalidade incompatível com a atividade profissional. Os registros poderão compor avaliações operacionais, mediante critérios transparentes, objetivos e pertinentes às funções desempenhadas.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">14. INDICADORES, RANKINGS E AUTOMAÇÕES</h4>
+    <p>O sistema poderá apresentar indicadores de assiduidade, organização de equipes, distribuição de folgas, produtividade operacional e outros resultados relacionados às funcionalidades utilizadas. Os critérios relevantes deverão ser transparentes e sujeitos a conferência. Sempre que houver decisões tomadas unicamente com base em tratamento automatizado que afetem interesses do titular, serão observados os direitos previstos na legislação, inclusive o direito de solicitar revisão nos casos aplicáveis. Rankings e pontuações não deverão, isoladamente, fundamentar sanções ou decisões trabalhistas sem avaliação adequada. O uso de recursos de inteligência artificial deverá ser limitado às finalidades previamente informadas, com salvaguardas proporcionais. Dados sensíveis, fotografias de ponto e documentos pessoais não deverão ser enviados indiscriminadamente a serviços de inteligência artificial.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">15. COMUNICAÇÕES INTERNAS</h4>
+    <p>O sistema poderá disponibilizar comunicados, avisos, lembretes, enquetes e confirmações de ciência. As confirmações poderão ser registradas individualmente para comprovar a disponibilização e a manifestação do colaborador. A empresa deverá distinguir ciência de comunicado, aceite de termo, concordância com alteração contratual e consentimento para tratamento de dados. Notificações opcionais poderão ser ativadas ou desativadas conforme as configurações disponíveis.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">16. CONSUMO INTERNO, VALES E RECOMPENSAS</h4>
+    <p>Quando houver integração com sistemas de consumo interno, poderão ser processadas informações necessárias à identificação de contas vinculadas, limites, saldos, movimentações e benefícios aplicáveis. O acesso aos dados financeiros individuais deverá ser limitado aos responsáveis autorizados e ao próprio titular, conforme sua finalidade. A utilização dessas informações deverá observar os critérios legais aplicáveis a descontos, compensações e obrigações trabalhistas. A ciência desta Política não autoriza automaticamente descontos salariais, reconhecimento de dívidas ou compensações financeiras que dependam de fundamento próprio. Programas de recompensas terão critérios específicos, transparentes e comunicados aos participantes.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">17. COMPARTILHAMENTO DE DADOS E FORNECEDORES</h4>
+    <p>Para operar o sistema, determinadas informações poderão ser tratadas por prestadores de serviços tecnológicos, de autenticação, hospedagem, armazenamento, comunicação e gestão empresarial. Conforme as integrações efetivamente utilizadas, esses serviços poderão incluir:</p>
+    <ul style="margin: 6px 0 12px 20px; padding: 0;">
+      <li>Google Firebase e demais serviços Google necessários à operação.</li>
+      <li>Google Drive, para armazenamento documental e imagens.</li>
+      <li>Google Calendar, para eventos e escalas, quando habilitado.</li>
+      <li>Takeat, para dados de consumo interno, quando integrado.</li>
+      <li>WhatsApp e serviços de comunicação, quando utilizados.</li>
+      <li>Serviços de inteligência artificial, quando expressamente habilitados e compatíveis com as finalidades autorizadas.</li>
+    </ul>
+    <p>O compartilhamento deverá limitar-se às informações necessárias e observar os requisitos legais e contratuais. A empresa não comercializará dados pessoais dos colaboradores. Eventuais transferências internacionais de dados deverão observar as condições e os mecanismos exigidos pela LGPD. O uso efetivo de cada fornecedor, as categorias de dados compartilhadas e as condições contratuais deverão ser identificados no inventário de tratamento da empresa.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">18. SEGURANÇA DA INFORMAÇÃO</h4>
+    <p>O Grupo House 190 deverá adotar medidas técnicas e administrativas proporcionais aos riscos envolvidos, incluindo, quando aplicável: autenticação segura; controle de acesso por usuário, perfil e unidade; restrição de acesso a informações sensíveis; registros de auditoria; proteção de dados durante transmissão e armazenamento; controle de permissões administrativas; procedimentos de cópia de segurança e recuperação; revisão e revogação de acessos desnecessários; tratamento de incidentes de segurança; e proteção dos comprovantes eletrônicos e históricos de alterações. A implementação e a efetividade dessas medidas deverão ser verificadas periodicamente. Nenhum ambiente digital está totalmente imune a riscos. Incidentes relevantes serão tratados conforme os procedimentos e as obrigações legais aplicáveis.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">19. RESPONSABILIDADES DOS USUÁRIOS</h4>
+    <p>Cada usuário deverá proteger suas credenciais de acesso e utilizar exclusivamente sua conta individual. Não é permitido compartilhar senhas, utilizar a identidade digital de outro colaborador, falsificar marcações, manipular registros ou acessar informações sem autorização. Suspeitas de acesso indevido, perda de credenciais e possíveis incidentes deverão ser comunicados à administração pelos canais disponibilizados. As medidas disciplinares eventualmente relacionadas ao uso irregular do sistema dependerão de apuração, proporcionalidade e observância da legislação.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">20. COOKIES E ARMAZENAMENTO LOCAL</h4>
+    <p>O sistema poderá utilizar mecanismos de sessão e armazenamento local necessários à autenticação, segurança, funcionamento do aplicativo instalado e manutenção de preferências. Esses recursos poderão envolver cookies, localStorage, IndexedDB ou outros mecanismos técnicos, conforme a implementação. O inventário de tecnologias utilizadas deverá identificar suas finalidades e características. Caso venham a ser utilizados recursos opcionais de publicidade ou rastreamento, deverão ser adotados os controles e as informações exigidos pela legislação.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">21. ARMAZENAMENTO E RETENÇÃO</h4>
+    <p>Os dados serão mantidos pelo período necessário às finalidades legítimas e aos prazos legais aplicáveis. O prazo de conservação poderá variar conforme a natureza dos dados, as obrigações trabalhistas, a necessidade de comprovação de registros, o exercício regular de direitos e outras exigências normativas. O encerramento do vínculo profissional não implica eliminação automática dos registros cuja conservação seja legalmente necessária. Encerrada a finalidade e inexistindo outra hipótese legal de conservação, os dados deverão ser eliminados ou anonimizados, conforme aplicável. A empresa deverá manter uma tabela interna de retenção por categoria de dado, abrangendo também cópias de segurança e registros de auditoria.</p>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">22. DIREITOS DOS COLABORADORES</h4>
+    <p>Nos termos da LGPD (Art. 18 da Lei nº 13.709/2018), o titular poderá solicitar, conforme os requisitos legais:</p>
+    <ul style="margin: 6px 0 12px 20px; padding: 0;">
+      <li>Confirmação de existência de tratamento de dados.</li>
+      <li>Acesso às suas informações pessoais.</li>
+      <li>Correção de dados incompletos, inexatos ou desatualizados.</li>
+      <li>Informação sobre compartilhamentos realizados.</li>
+      <li>Informação sobre as finalidades e hipóteses legais aplicáveis.</li>
+      <li>Anonimização, bloqueio ou eliminação de dados desnecessários, excessivos ou tratados em desconformidade com a legislação.</li>
+      <li>Portabilidade dos dados a outro fornecedor, observadas as normas regulamentares e segredos comerciais.</li>
+      <li>Eliminação dos dados pessoais tratados com o consentimento do titular, ressalvadas as hipóteses legais de conservação.</li>
+      <li>Revogação do consentimento, quando esta for a base legal aplicável.</li>
+      <li>Revisão de decisões tomadas unicamente com base em tratamento automatizado, quando aplicável.</li>
+    </ul>
+
+    <h4 style="font-size: 15px; margin: 18px 0 6px; color: var(--text-primary, #0f172a);">23. CANAL DE PRIVACIDADE E DISPOSIÇÕES FINAIS</h4>
+    <p>Para exercer seus direitos, esclarecer dúvidas, solicitar informações sobre a empresa responsável pelo tratamento dos seus dados ou comunicar incidentes de privacidade, o colaborador poderá entrar em contato pelo canal oficial de privacidade:</p>
+    <p><strong>Canal Oficial de Privacidade:</strong> privacidade@grupohouse190.com.br (ou diretamente junto ao departamento de Recursos Humanos do Grupo House 190).</p>
+    <p>Esta Política de Privacidade poderá ser atualizada periodicamente para refletir melhorias técnicas, adequações operacionais e atualizações legislativas, mantendo-se sempre disponível para consulta no aplicativo Gestão de Folgas 3.0.</p>
+
+    <!-- Bloco Oficial de Ciência e Assinatura Digital do Colaborador -->
+    <div id="privacyPolicySignSection" style="margin-top: 28px; padding: 20px; border-radius: 14px; border: 1.5px solid var(--border-color, #cbd5e1); background: var(--bg-hover, #f8fafc);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; color: var(--primary, #6340d8);">Formalização de Ciência e Assinatura</span>
+          <h4 style="margin: 2px 0 0; font-size: 16px; font-weight: 700; color: var(--text-primary, #0f172a);">Termo de Ciência da Política de Privacidade</h4>
+        </div>
+        <div id="privacyPolicySignMeta" style="font-size: 12px; color: var(--text-muted, #64748b); text-align: right;"></div>
+      </div>
+
+      <p style="font-size: 13px; line-height: 1.6; color: var(--text-secondary, #334155); margin-bottom: 14px;">
+        Ao confirmar e assinar este termo, o colaborador atesta que teve acesso integral à <strong>Política de Privacidade e Proteção de Dados Pessoais do Grupo House 190</strong> (Versão 1.0), compreendendo as regras, direitos, finalidades e bases legais relativas ao tratamento dos seus dados pessoais e dados de controle de jornada.
+      </p>
+
+      <div id="privacyPolicyPendingSignatureBlock">
+        <label style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; cursor: pointer; user-select: none;">
+          <input type="checkbox" id="privacyPolicyConfirmCheckbox" onchange="updatePrivacyPolicySignButtonState_()" style="margin-top: 3px; width: 18px; height: 18px; accent-color: var(--primary, #6340d8); cursor: pointer;">
+          <span style="font-size: 13px; font-weight: 600; color: var(--text-primary, #0f172a);">
+            Declaro que li, compreendi e manifesto minha ciência em relação à Política de Privacidade do Grupo House 190.
+          </span>
+        </label>
+
+        <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary, #334155);">Rubrica ou assinatura manuscrita do colaborador:</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="privacyPolicyClearCanvasBtn" onclick="clearPrivacyPolicyCanvas_()" style="font-size: 12px; padding: 4px 8px;">Limpar rubrica</button>
+        </div>
+
+        <div class="privacy-policy-canvas-wrap" style="width: 100%; height: 130px; background: #ffffff; border: 1.5px dashed var(--border-color, #cbd5e1); border-radius: 10px; position: relative; touch-action: none; overflow: hidden;">
+          <canvas id="privacyPolicyCanvas" style="width: 100%; height: 100%; display: block; cursor: crosshair;"></canvas>
+          <div style="position: absolute; bottom: 8px; left: 16px; right: 16px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; pointer-events: none; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding-top: 2px;">
+            <span>Rubrica manuscrita</span>
+            <span>Registro seguro</span>
+          </div>
+        </div>
+        <small style="display: block; margin-top: 6px; font-size: 11px; color: var(--text-muted, #64748b);">
+          Desenhe sua rubrica no quadro acima utilizando o dedo ou cursor.
+        </small>
+      </div>
+
+      <div id="privacyPolicySignedCard" class="hidden" style="padding: 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div>
+            <div style="font-weight: 700; color: #166534; font-size: 13.5px;">Ciência e assinatura formalizadas com sucesso</div>
+            <div id="privacyPolicySignedDetails" style="font-size: 12px; color: #15803d; margin-top: 2px;"></div>
+          </div>
+          <div id="privacyPolicySignedImageWrap" style="max-height: 50px; background: #ffffff; padding: 4px 8px; border-radius: 6px; border: 1px solid #dcfce7; display: none;">
+            <img id="privacyPolicySignedImage" alt="Assinatura" style="max-height: 42px; display: block;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="privacyPolicyDialogFooter" style="flex: none; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-top: 1px solid var(--border-color, #e2e8f0); background: var(--bg-hover, #f8fafc); flex-wrap: wrap; gap: 8px;">
+    <div id="privacyPolicyAckStatus" style="font-size: 11px; color: var(--text-muted, #64748b); flex: 1; min-width: 0;"></div>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary" onclick="printPrivacyPolicy_()" style="font-size: 13px; padding: 8px 14px;">Imprimir</button>
+      <button type="button" class="btn btn-secondary" id="privacyPolicyCloseBtn" onclick="closeDialog('privacyPolicyDialog')" style="font-size: 13px; padding: 8px 14px;">Fechar</button>
+      <button type="button" class="btn btn-primary" id="privacyPolicyAckBtn" onclick="acknowledgePrivacyPolicy_()" style="font-size: 13px; padding: 8px 16px;">Assinar e confirmar ciência</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Modal: Pop-up de Abertura de Turno (Aviso Operacional) -->
+<dialog id="operationalNoticeDialog" class="operational-notice-modal" style="max-width: 520px; width: 94vw; border-radius: 24px; padding: 0; border: 1px solid var(--line, #e2e8f0); background: var(--surface, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
+  <div class="dialog-head" style="padding: 18px 20px 12px; border-bottom: 1px solid var(--line, #e2e8f0); display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <span class="eyebrow" style="color: #6366f1; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;">MURAL DA CASA • ORIENTAÇÃO DO TURNO</span>
+      <h3 id="operationalNoticeModalHeading" style="margin: 2px 0 0; font-size: 19px; font-weight: 800; color: var(--text);">Aviso Operacional</h3>
+    </div>
+    <button type="button" class="icon-btn" data-close="operationalNoticeDialog" aria-label="Fechar" style="background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">✕</button>
+  </div>
+  <div class="dialog-body" style="padding: 18px 20px; max-height: 60vh; overflow-y: auto;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+      <span id="operationalNoticeTypeBadge" class="notice-badge" style="display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 700; background: #e0e7ff; color: #4338ca;">Aviso Operacional</span>
+      <span id="operationalNoticeStoreBadge" style="display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: var(--surface-2, #f1f5f9); color: var(--muted, #475569);">Todas as Unidades</span>
+      <small id="operationalNoticeDate" style="color: var(--muted, #64748b); font-size: 12px; font-weight: 600;"></small>
+    </div>
+    <h4 id="operationalNoticeModalTitle" style="font-size: 17px; font-weight: 800; color: var(--text); margin: 0 0 10px; line-height: 1.35;"></h4>
+    <div id="operationalNoticeModalBody" style="font-size: 14.5px; line-height: 1.6; color: var(--text); white-space: pre-wrap; background: var(--surface-2, #f8fafc); padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line, #e2e8f0);"></div>
+    <div id="operationalNoticeModalMeta" style="margin-top: 14px; font-size: 12px; color: var(--muted, #64748b); text-align: right; font-weight: 600;"></div>
+  </div>
+  <div class="dialog-actions" style="padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 12px)); border-top: 1px solid var(--line, #e2e8f0); background: var(--surface); display: flex; justify-content: flex-end; gap: 10px;">
+    <button type="button" class="btn btn-secondary" data-close="operationalNoticeDialog">Fechar</button>
+    <button type="button" id="operationalNoticeAckBtn" class="btn btn-primary" style="min-width: 160px;">Confirmar Ciência</button>
+  </div>
+</dialog>
+
+<!-- Modal: Criação de Novo Aviso Operacional (Gestores/Admin) -->
+<dialog id="newAnnouncementDialog" style="max-width: 540px; width: 94vw; border-radius: 24px; padding: 0; border: 1px solid var(--line, #e2e8f0); background: var(--surface, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
+  <form id="newAnnouncementForm">
+    <div class="dialog-head" style="padding: 18px 20px 12px; border-bottom: 1px solid var(--line, #e2e8f0); display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <span class="eyebrow" style="color: #6366f1; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;">COMUNICAÇÃO INTERNA</span>
+        <h3 style="margin: 2px 0 0; font-size: 19px; font-weight: 800; color: var(--text);">Novo Aviso Operacional</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="newAnnouncementDialog" aria-label="Fechar" style="background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">✕</button>
+    </div>
+    <div class="dialog-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto;">
+      <div>
+        <label for="newAnnouncementTitle" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Título do aviso *</label>
+        <input type="text" id="newAnnouncementTitle" class="form-input" placeholder="Ex: Foco na montagem rápida hoje / Treinamento de higiene às 15h" required style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line);">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <label for="newAnnouncementType" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Tipo de mensagem</label>
+          <select id="newAnnouncementType" class="form-input" style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line);">
+            <option value="Operacional">Operacional</option>
+            <option value="Urgente">Atenção Urgente</option>
+            <option value="Treinamento">Treinamento</option>
+            <option value="Comemorativo">Comemoração / Meta</option>
+          </select>
+        </div>
+        <div>
+          <label for="newAnnouncementStore" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Unidade</label>
+          <select id="newAnnouncementStore" class="form-input" style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line);"></select>
+        </div>
+      </div>
+      <div>
+        <label for="newAnnouncementBody" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Orientações detalhadas para a equipe *</label>
+        <textarea id="newAnnouncementBody" class="form-input" rows="4" placeholder="Descreva os direcionamentos para a equipe neste turno..." required style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line); resize: vertical;"></textarea>
+      </div>
+    </div>
+    <div class="dialog-actions" style="padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 12px)); border-top: 1px solid var(--line, #e2e8f0); background: var(--surface); display: flex; justify-content: flex-end; gap: 10px;">
+      <button type="button" class="btn btn-secondary" data-close="newAnnouncementDialog">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Publicar no Mural</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal: Homenagear Destaque da Semana (Gestores/Admin) -->
+<dialog id="recognizeEmployeeDialog" style="max-width: 540px; width: 94vw; border-radius: 24px; padding: 0; border: 1px solid var(--line, #e2e8f0); background: var(--surface, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
+  <form id="recognizeEmployeeForm">
+    <div class="dialog-head" style="padding: 18px 20px 12px; border-bottom: 1px solid var(--line, #e2e8f0); display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <span class="eyebrow" style="color: #d97706; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;">RECONHECIMENTO OPERACIONAL</span>
+        <h3 style="margin: 2px 0 0; font-size: 19px; font-weight: 800; color: var(--text);">Destaque da Semana</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="recognizeEmployeeDialog" aria-label="Fechar" style="background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">✕</button>
+    </div>
+    <div class="dialog-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto;">
+      <div>
+        <label for="recognizeEmployeeSelect" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Colaborador homenageado *</label>
+        <select id="recognizeEmployeeSelect" class="form-input" required style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line);"></select>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px;">
+        <div>
+          <label for="recognizeCategorySelect" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Categoria do mérito</label>
+          <select id="recognizeCategorySelect" class="form-input" style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line);">
+            <option value="Mestre da Chapa">Mestre da Chapa</option>
+            <option value="Pontualidade Britânica">Pontualidade Britânica</option>
+            <option value="Excelência no Atendimento">Excelência no Atendimento</option>
+            <option value="Destaque da Cozinha">Destaque da Cozinha</option>
+            <option value="Espírito de Equipe">Espírito de Equipe</option>
+            <option value="Capricho & Higiene">Capricho & Higiene</option>
+          </select>
+        </div>
+        <div>
+          <label for="recognizeWeekInput" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Semana / Período</label>
+          <input type="text" id="recognizeWeekInput" class="form-input" placeholder="Ex: Semana atual" style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line);">
+        </div>
+      </div>
+      <div>
+        <label for="recognizeReasonInput" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">Elogio da liderança (motivo do destaque) *</label>
+        <textarea id="recognizeReasonInput" class="form-input" rows="3" placeholder="Ex: Demonstrou dedicação ímpar no sábado à noite, garantindo agilidade na montagem e organização impecável da praça..." required style="width: 100%; border-radius: 12px; padding: 10px 14px; font-size: 14px; border: 1px solid var(--line); resize: vertical;"></textarea>
+      </div>
+    </div>
+    <div class="dialog-actions" style="padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 12px)); border-top: 1px solid var(--line, #e2e8f0); background: var(--surface); display: flex; justify-content: flex-end; gap: 10px;">
+      <button type="button" class="btn btn-secondary" data-close="recognizeEmployeeDialog">Cancelar</button>
+      <button type="submit" class="btn btn-primary" style="background: #d97706; border-color: #d97706;">Registrar Destaque</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal: Auditoria de Ciência do Aviso Operacional (Gestores/Admin) -->
+<dialog id="noticeReadingsDialog" style="max-width: 520px; width: 94vw; border-radius: 24px; padding: 0; border: 1px solid var(--line, #e2e8f0); background: var(--surface, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
+  <div class="dialog-head" style="padding: 18px 20px 12px; border-bottom: 1px solid var(--line, #e2e8f0); display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <span class="eyebrow" style="color: #4338ca; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;">AUDITORIA DE CIÊNCIA • MURAL DA CASA</span>
+      <h3 id="noticeReadingsHeading" style="margin: 2px 0 0; font-size: 18px; font-weight: 800; color: var(--text);">Confirmações de Leitura</h3>
+    </div>
+    <button type="button" class="icon-btn" data-close="noticeReadingsDialog" aria-label="Fechar" style="background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">✕</button>
+  </div>
+  <div class="dialog-body" style="padding: 18px 20px; max-height: 60vh; overflow-y: auto;">
+    <div style="background: var(--surface-2, #f8fafc); border: 1px solid var(--line, #e2e8f0); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+        <span id="noticeReadingsStoreBadge" style="font-size: 11.5px; font-weight: 600; color: var(--muted, #64748b);">Todas as Unidades</span>
+        <span id="noticeReadingsCountBadge" style="font-size: 12px; font-weight: 700; color: #166534; background: #dcfce7; padding: 2px 10px; border-radius: 20px;">0 confirmações</span>
+      </div>
+      <div id="noticeReadingsNoticeTitle" style="font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.4;"></div>
+    </div>
+    
+    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted, #64748b); margin-bottom: 8px;">Colaboradores com ciência confirmada</div>
+    <div id="noticeReadingsList" style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="text-align: center; padding: 20px 10px; color: var(--muted, #64748b); font-size: 13.5px;">Carregando registros...</div>
+    </div>
+  </div>
+  <div class="dialog-actions" style="padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 12px)); border-top: 1px solid var(--line, #e2e8f0); background: var(--surface); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+    <button type="button" id="noticeReadingsDeleteBtn" class="btn" style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; font-weight: 700; min-height: 44px; padding: 0 16px; border-radius: 12px; cursor: pointer;">Excluir Aviso</button>
+    <button type="button" class="btn btn-secondary" data-close="noticeReadingsDialog" style="min-height: 44px; padding: 0 20px; border-radius: 12px;">Fechar</button>
+  </div>
+</dialog>
+
+<!-- Espelho de Ponto - Assinatura Eletrônica e Contestação (Portaria MTP nº 671/2021) -->
+<dialog id="timeClockSignDialog" class="timeclock-sign-dialog" style="max-width: 680px; width: 95vw; border-radius: 20px; padding: 0; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
+  <form id="timeClockSignForm" method="dialog" style="display:flex; flex-direction:column; max-height:90vh; margin:0;">
+    <div class="dialog-head" style="padding: 16px 20px; border-bottom: 1px solid var(--line, #e2e8f0); display: flex; justify-content: space-between; align-items: center; background: var(--surface-muted, #f8fafc);">
+      <div>
+        <span class="eyebrow" style="font-size: 11px; font-weight: 700; color: var(--primary, #007aff); letter-spacing: 0.5px; text-transform: uppercase;">PORTARIA MTP Nº 671/2021 &bull; MP 2.200-2</span>
+        <h3 id="clockSignModalTitle" style="margin: 4px 0 0; font-size: 17px; font-weight: 700; color: var(--text, #0f172a);">Assinar Espelho de Ponto</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close="timeClockSignDialog" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--muted, #64748b);">✕</button>
+    </div>
+
+    <div class="dialog-body" style="padding: 18px 20px; overflow-y: auto; flex: 1; display:flex; flex-direction:column; gap:16px;">
+      <!-- Identificação do Colaborador e Mês -->
+      <div id="clockSignEmployeeInfo" style="background: var(--surface-muted, #f8fafc); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line, #e2e8f0); font-size: 13px; line-height: 1.5;"></div>
+
+      <!-- Resumo de Horas (KPIs) -->
+      <div id="clockSignMetricsRow" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;"></div>
+
+      <!-- Alerta ou Selo de Status -->
+      <div id="clockSignStatusBanner" class="hidden" style="border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 500;"></div>
+
+      <!-- Tabela Resumo dos Dias do Mês (Rolável) -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 13px; color: var(--text, #0f172a);">Demonstrativo Diário de Apuração</strong>
+          <span style="font-size: 11px; color: var(--muted, #64748b);">Role para conferir todos os dias</span>
+        </div>
+        <div id="clockSignDaysWrap" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: var(--surface, #ffffff);">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums;">
+            <thead style="position: sticky; top: 0; background: var(--surface-muted, #f1f5f9); z-index: 1;">
+              <tr>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Dia</th>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Entrada</th>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Intervalo</th>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Retorno</th>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Saída</th>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Trabalhado</th>
+                <th style="padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--line, #cbd5e1);">Saldo</th>
+              </tr>
+            </thead>
+            <tbody id="clockSignDaysBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Seção de Assinatura (Canvas de Rubrica) -->
+      <div id="clockSignActionSection" style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <strong style="font-size: 13px; color: var(--text, #0f172a);">Rubrica Digital (desenhe no quadro abaixo):</strong>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button id="clockSignRotateCanvasBtn" type="button" class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px; min-height: 32px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px; color: #4338ca; background: #eef2ff; border: 1px solid #c7d2fe;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2.5"/><path d="m14 2 3 3-3 3"/><path d="M5 2h9"/></svg>
+              <span>Virar para assinar</span>
+            </button>
+            <button id="clockSignClearCanvasBtn" type="button" class="btn btn-ghost" style="font-size: 12px; padding: 4px 10px; min-height: 32px; border-radius: 8px;">Limpar traço</button>
+          </div>
+        </div>
+
+        <div style="border: 2px dashed var(--line, #cbd5e1); border-radius: 14px; background: #ffffff; height: 140px; position: relative; touch-action: none; overflow: hidden;">
+          <canvas id="clockSignCanvas" style="width: 100%; height: 100%; display: block; cursor: crosshair;"></canvas>
+          <div style="position: absolute; bottom: 8px; left: 14px; right: 14px; border-top: 1px solid rgba(0,0,0,0.12); display: flex; justify-content: space-between; pointer-events: none;">
+            <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Linha de assinatura</span>
+            <span style="font-size: 10px; color: #94a3b8;">Tela touch</span>
+          </div>
+        </div>
+
+        <!-- Termo de Declaração Legal -->
+        <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--muted, #475569); line-height: 1.4; cursor: pointer; user-select: none;">
+          <input type="checkbox" id="clockSignCheckTerms" required style="margin-top: 2px; width: 16px; height: 16px; accent-color: var(--primary, #007aff);" />
+          <span>Declaro que conferi todos os registros de ponto e o saldo do mês acima, concordando plenamente com as informações nos termos da Portaria MTP nº 671/2021.</span>
+        </label>
+      </div>
+
+      <!-- Seção de Contestação (Opcional) -->
+      <div id="clockContestSection" class="hidden" style="background: #fff7ed; border: 1px solid #fdba74; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <strong style="font-size: 13px; color: #9a3412;">Motivo da Contestação / Divergência</strong>
+        <p style="margin: 0; font-size: 12px; color: #7c2d12;">Descreva quais dias e horários estão incorretos para que o gestor possa analisar e ajustar.</p>
+        <textarea id="clockContestReason" rows="3" placeholder="Ex: No dia 14/10 realizei hora extra até as 23h mas constou saída às 22h..." style="width: 100%; border-radius: 8px; border: 1px solid #fdba74; padding: 8px; font-size: 12.5px; box-sizing: border-box;"></textarea>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" id="clockCancelContestBtn" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; min-height: 36px; border-radius: 8px;">Cancelar contestação</button>
+          <button type="button" id="clockSubmitContestBtn" class="btn btn-primary" style="font-size: 12px; padding: 6px 14px; min-height: 36px; border-radius: 8px; background: #ea580c; border-color: #ea580c;">Enviar contestação ao gestor</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-actions" style="padding: 14px 20px; border-top: 1px solid var(--line, #e2e8f0); display: flex; justify-content: space-between; align-items: center; background: var(--surface-muted, #f8fafc);">
+      <button type="button" id="clockToggleContestBtn" class="btn btn-ghost" style="color: #dc2626; font-size: 12.5px; padding: 6px 10px; min-height: 44px; border-radius: 10px;">
+        Contestar apuração
+      </button>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn btn-secondary" data-close="timeClockSignDialog" style="min-height: 44px; border-radius: 12px; padding: 8px 16px;">
+          Fechar
+        </button>
+        <button type="button" id="clockConfirmSignBtn" class="btn btn-primary" style="min-height: 44px; border-radius: 12px; padding: 8px 20px; font-weight: 700; background: #16a34a; border-color: #16a34a;">
+          Confirmar assinatura digital
+        </button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+
+
+
+

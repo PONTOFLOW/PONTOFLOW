@@ -1,0 +1,177 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {scheduleForDay,workday,active,shiftDate} from '../src/core/reminder-policy.js';
+const source=(await readFile(new URL('../src/journey.js',import.meta.url),'utf8')).replace(/^import .*;\n/,'');
+function harness(){
+ const nodes=new Map(),events={};
+ const document={querySelector(s){if(!nodes.has(s))nodes.set(s,{innerHTML:'',classList:{toggle(){}}});return nodes.get(s)},querySelectorAll(){return []},addEventListener(k,f){events[k]=f}};
+ const window={addEventListener(k,f){events[k]=f}};
+ vm.runInNewContext(source,{document,window,setInterval(){},Date,Intl,scheduleForDay,workday,active,shiftDate});
+ return {nodes,events,send(detail){events['house-journey']({detail})}};
+}
+test('painel usa contagens reais, escapa nomes e limpa dados gerenciais ao trocar de perfil',()=>{
+ const h=harness();h.send({manager:true,presence:{presence:[{Nome:'<img onerror=x>',LojaID:'1',status:'trabalhando',horarioEscala:'17:00 — 01:00',entryTime:'17:12'}]}});
+ assert.match(h.nodes.get('#journeyHome').innerHTML,/100%/);
+ assert.match(h.nodes.get('#journeyHome').innerHTML,/12 min após/);
+ assert.doesNotMatch(h.nodes.get('#journeyHome').innerHTML,/<img/);
+ h.send({manager:false,user:{funcionarioId:'2'}});
+ assert.doesNotMatch(h.nodes.get('#journeyHome').innerHTML,/onerror/);
+ assert.match(h.nodes.get('#journeyTeam').innerHTML,/disponível para gestores/);
+});
+test('seletor de unidade altera equipe, indicadores e escala sem misturar lojas',()=>{
+ const h=harness();h.send({manager:true,stores:[{LojaID:'1',Nome:'Centro'},{LojaID:'2',Nome:'Sul'}],presence:{presence:[{Nome:'Ana',LojaID:'1',status:'trabalhando'},{Nome:'Bruno',LojaID:'2',status:'intervalo'}]}});
+ h.events.change({target:{matches:()=>true,value:'1'}});
+ assert.match(h.nodes.get('#journeyTeam').innerHTML,/Ana/);
+ assert.doesNotMatch(h.nodes.get('#journeyTeam').innerHTML,/Bruno/);
+});
+test('escala semanal respeita folgas aprovadas e jornadas vigentes',()=>{
+ const h=harness();const day=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bahia',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ h.send({manager:true,employees:[{FuncionarioID:'1',Nome:'Ana',Ativo:true}],schedules:[{FuncionarioID:'1',Ativa:true,HoraEntrada:'17:00',HoraSaida:'01:00',DiasTrabalho:'0,1,2,3,4,5,6'}],timeOff:[{FuncionarioID:'1',Status:'Aprovada',DataInicio:day,DataFim:day}]});
+ assert.doesNotMatch(h.nodes.get('#journeySchedule').innerHTML,/<strong>Ana/);
+ h.events.click({target:{closest(s){return s==='[data-j-mode]'?{dataset:{jMode:'semana'}}:null}}});
+ assert.match(h.nodes.get('#journeySchedule').innerHTML,/<strong>Ana/);
+});
+test('unidades usam NomeLoja real e removem repetição pelo ID, preservando homônimos',()=>{
+ const h=harness();h.send({manager:true,stores:[{LojaID:'1',NomeLoja:'House TX'},{LojaID:'1',Nome:'Duplicado'},{LojaID:'2',nomeLoja:'Food Park TX'}],presence:{presence:[{FuncionarioID:'a',Nome:'Ana',LojaID:'1',status:'trabalhando'},{FuncionarioID:'a',Nome:'Ana',LojaID:'1',status:'trabalhando'},{FuncionarioID:'b',Nome:'Ana',LojaID:'1',status:'trabalhando'}]}});
+ const html=h.nodes.get('#journeyTeam').innerHTML;
+ assert.match(html,/>House TX<\/option>/);assert.match(html,/>Food Park TX<\/option>/);assert.doesNotMatch(html,/Duplicado/);
+ assert.equal((html.match(/<strong>Ana<\/strong>/g)||[]).length,2);
+ assert.match(html,/House TX<\/small>/);
+});
+
+test('central de decisões respeita unidade inclusive quando a pendência só informa o funcionário',()=>{
+ const h=harness();
+ h.send({manager:true,coreReady:true,employees:[{FuncionarioID:'1',LojaID:'a'},{FuncionarioID:'2',LojaID:'b'}],stores:[{LojaID:'a',NomeLoja:'Centro'},{LojaID:'b',NomeLoja:'Sul'}],pending:[{FuncionarioID:'1',NomeFuncionario:'Ponto Centro',Data:'2026-09-01'},{FuncionarioID:'2',NomeFuncionario:'Ponto Sul',Data:'2026-09-01'}],timeOff:[{FuncionarioID:'1',LojaID:'a',NomeFuncionario:'Pedido Centro',Status:'Pendente'},{FuncionarioID:'2',LojaID:'b',NomeFuncionario:'Pedido Sul',Status:'Pendente'}]});
+ h.events.change({target:{matches:()=>true,value:'a'}});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ assert.match(html,/Ponto Centro/);assert.match(html,/Pedido Centro/);
+ assert.doesNotMatch(html,/Ponto Sul|Pedido Sul/);
+});
+test('área pessoal identifica o cadastro pelo ID e nunca expõe pedidos de colegas',()=>{
+ const h=harness();
+ h.send({manager:false,coreReady:true,user:{FuncionarioID:'me'},employees:[{FuncionarioID:'other',Nome:'Outra pessoa',SaldoFolgas:99},{FuncionarioID:'me',Nome:'Eu',SaldoFolgas:3}],timeOff:[{FuncionarioID:'other',TipoFolga:'SEGREDO',Status:'Pendente'},{FuncionarioID:'me',TipoFolga:'Meu pedido',Status:'Pendente'}]});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ assert.match(html,/Meu pedido/);assert.match(html,/<strong>3<\/strong>/);
+ assert.doesNotMatch(html,/SEGREDO|Outra pessoa|<strong>99<\/strong>/);
+});
+test('falha ao carregar ponto não é apresentada como jornada concluída',()=>{
+ const h=harness();
+ h.send({user:{FuncionarioID:'me'},clock:{loadError:'Rede indisponível',todayRecords:[],nextAction:''}});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ assert.match(html,/Rede indisponível/);assert.match(html,/Tentar carregar meu ponto/);
+ assert.doesNotMatch(html,/Jornada concluída|Tudo registrado/);
+});
+test('programação pessoal usa os quatro nomes de marcação para dois turnos',()=>{
+ const h=harness();h.send({user:{FuncionarioID:'me'},clock:{flexibleTwoShifts:true,nextAction:'RETORNO_INTERVALO',todayRecords:[]}});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ for(const label of ['Entrada 1','Saída 1','Entrada 2','Saída 2']) assert.match(html,new RegExp(label));
+ assert.match(html,/(?:Abrir|Bater) ponto · Entrada 2/);
+});
+
+test('quadro de equipe permite alternar para lista sem perder o filtro da unidade',()=>{
+ const h=harness();h.send({manager:true,stores:[{LojaID:'1',NomeLoja:'Centro'},{LojaID:'2',NomeLoja:'Sul'}],presence:{presence:[{FuncionarioID:'a',Nome:'Ana',LojaID:'1',status:'trabalhando'},{FuncionarioID:'b',Nome:'Bruno',LojaID:'2',status:'intervalo'}]}});
+ assert.match(h.nodes.get('#journeyTeam').innerHTML,/v-team-column/);
+ h.events.click({target:{closest(s){return s==='[data-j-unit-card]'?{dataset:{jUnitCard:'1'}}:null}}});
+ h.events.click({target:{closest(s){return s==='[data-j-layout]'?{dataset:{jLayout:'lista'}}:null}}});
+ const html=h.nodes.get('#journeyTeam').innerHTML;
+ assert.match(html,/Ana/);assert.doesNotMatch(html,/Bruno|v-team-column/);
+});
+test('cartões de unidade não aparecem na área de funcionário',()=>{
+ const h=harness();h.send({manager:false,user:{FuncionarioID:'1'},stores:[{LojaID:'1',NomeLoja:'Centro'},{LojaID:'2',NomeLoja:'Sul'}],presence:{presence:[{FuncionarioID:'2',Nome:'Pessoa restrita',LojaID:'2',status:'trabalhando'}]}});
+ assert.doesNotMatch(h.nodes.get('#journeyHome').innerHTML,/v-units|Pessoa restrita/);
+});
+
+test('gestor conserva decisões de folga, ajuste e troca com atalhos para resolver',()=>{
+ const h=harness();h.send({manager:true,coreReady:true,pendingCounts:{total:4,timeOff:2,clock:1,swaps:1},incompletePunches:[{FuncionarioID:'a'},{FuncionarioID:'b'}],presence:{presence:[{Nome:'Ana',status:'ausente'},{Nome:'Bia',status:'trabalhando',entryTime:'17:12',horarioEscala:'17:00 — 01:00'}]}});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ assert.match(html,/<strong>4<\/strong><span>solicitações aguardando decisão/);
+ assert.match(html,/2 folgas · 1 ponto · 1 troca/);
+ assert.match(html,/<strong>2<\/strong><span>pontos incompletos/);
+ assert.match(html,/data-pending-filter-target="clock"/);
+ assert.match(html,/data-jump-team="atrasados"/);assert.match(html,/data-jump-team="ausente"/);
+ assert.doesNotMatch(html,/data-live-clock/);
+});
+
+test('cards de pedidos na jornada possuem estrutura adaptativa com w-request-body',()=>{
+ const h=harness();
+ h.send({manager:false,coreReady:true,user:{FuncionarioID:'me'},timeOff:[{FuncionarioID:'me',TipoFolga:'Folga manual',Motivo:'Quinta folga do mês',Status:'Aprovada',DataInicio:'2026-10-11',DataFim:'2026-10-11'}]});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ assert.match(html,/class="w-request"/);
+ assert.match(html,/class="w-request-body"><strong>Folga manual<\/strong><small>Quinta folga do mês<\/small><\/div>/);
+ assert.match(html,/class="w-badge ok">Aprovada<\/span>/);
+});
+
+test('card w-wallet destaca saldo devedor, chip de folga semanal e ações simétricas sem duplicar avisos',()=>{
+ const h=harness();
+ h.send({manager:false,coreReady:true,user:{FuncionarioID:'me'},employees:[{FuncionarioID:'me',Nome:'Gabriel',SaldoFolgas:7,DiaFolgaPreferencial:'Terça-feira'}],balance:{employees:[{FuncionarioID:'me',saldoTexto:'-20h 41min'}]}});
+ const html=h.nodes.get('#journeyHome').innerHTML;
+ assert.match(html,/class="balance-debit">-20h 41min<\/strong>/);
+ assert.match(html,/(?:w-fixed-off-badge|w-fixed-off-chip).*Folga(?: semanal)?: <strong>Terça-feira<\/strong>/);
+ assert.match(html,/data-j-request-leave>Pedir folga<\/button>/);
+ assert.match(html,/data-view-target="documents">.*Documentos.*<\/button>/);
+ const walletHtml = html.split('w-wallet')[1].split('</article>')[0];
+ assert.doesNotMatch(walletHtml,/data-view-target="notifications"/);
+});
+
+test('escala semanal exibe formato de grade de calendário de 7 dias com cabeçalhos e contagem de escalados',()=>{
+ const h=harness();
+ h.send({
+  manager:true,
+  employees:[{FuncionarioID:'1',Nome:'Carlos',Ativo:true,LojaID:'1'}],
+  schedules:[{FuncionarioID:'1',Ativa:true,HoraEntrada:'16:00',HoraSaida:'00:00',DiasTrabalho:'0,1,2,3,4,5,6'}],
+  stores:[{LojaID:'1',NomeLoja:'House Centro'}]
+ });
+ h.events.click({target:{closest(s){return s==='[data-j-mode]'?{dataset:{jMode:'semana'}}:null}}});
+ const html=h.nodes.get('#journeySchedule').innerHTML;
+ assert.match(html,/class="j-cal-week-grid"/);
+ assert.match(html,/class="j-cal-col-weekday"/);
+ assert.match(html,/class="j-cal-headcount has-staff"/);
+ assert.match(html,/<strong>Carlos<\/strong>/);
+ assert.match(html,/16:00 — 00:00/);
+});
+
+test('escala mensal renderiza matriz de dias com cabeçalho de dias da semana e chips de escala',()=>{
+ const h=harness();
+ h.send({
+  manager:true,
+  employees:[{FuncionarioID:'1',Nome:'Mariana',Ativo:true,LojaID:'1'}],
+  schedules:[{FuncionarioID:'1',Ativa:true,HoraEntrada:'09:00',HoraSaida:'17:00',DiasTrabalho:'0,1,2,3,4,5,6'}],
+  stores:[{LojaID:'1',NomeLoja:'House Centro'}]
+ });
+ h.events.click({target:{closest(s){return s==='[data-j-mode]'?{dataset:{jMode:'mês'}}:null}}});
+ const html=h.nodes.get('#journeySchedule').innerHTML;
+ assert.match(html,/class="j-cal-month-weekdays-bar"/);
+ assert.match(html,/<div>Seg<\/div><div>Ter<\/div><div>Qua<\/div><div>Qui<\/div><div>Sex<\/div><div>Sáb<\/div><div>Dom<\/div>/);
+ assert.match(html,/class="j-cal-month-grid"/);
+ assert.match(html,/j-cal-mini-chip/);
+ assert.match(html,/<strong>Mariana<\/strong>/);
+ assert.match(html,/data-j-cal-day=/);
+});
+
+test('filtro por loja na escala isola colaboradores da unidade selecionada via chip e atualiza o resumo',()=>{
+ const h=harness();
+ h.send({
+  manager:true,
+  employees:[
+   {FuncionarioID:'1',Nome:'Ana Centro',Ativo:true,LojaID:'1'},
+   {FuncionarioID:'2',Nome:'Bruno Sul',Ativo:true,LojaID:'2'}
+  ],
+  schedules:[
+   {FuncionarioID:'1',Ativa:true,HoraEntrada:'17:00',HoraSaida:'01:00',DiasTrabalho:'0,1,2,3,4,5,6'},
+   {FuncionarioID:'2',Ativa:true,HoraEntrada:'18:00',HoraSaida:'02:00',DiasTrabalho:'0,1,2,3,4,5,6'}
+  ],
+  stores:[{LojaID:'1',NomeLoja:'Centro'},{LojaID:'2',NomeLoja:'Sul'}]
+ });
+ h.events.click({target:{closest(s){return s==='[data-j-mode]'?{dataset:{jMode:'semana'}}:null}}});
+ assert.match(h.nodes.get('#journeySchedule').innerHTML,/Ana Centro/);
+ assert.match(h.nodes.get('#journeySchedule').innerHTML,/Bruno Sul/);
+
+ // Clica no chip da loja '1' (Centro)
+ h.events.click({target:{closest(s){return s==='[data-j-unit-chip]'?{dataset:{jUnitChip:'1'}}:null}}});
+ const filteredHtml=h.nodes.get('#journeySchedule').innerHTML;
+ assert.match(filteredHtml,/Loja: <strong>Centro<\/strong>/);
+ assert.match(filteredHtml,/Ana Centro/);
+ assert.doesNotMatch(filteredHtml,/Bruno Sul/);
+});

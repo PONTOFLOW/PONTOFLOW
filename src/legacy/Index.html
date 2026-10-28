@@ -1,0 +1,2727 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1B365D" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Jornada" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="./manifest.webmanifest?v=6.16.45" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/app-icon-192.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="./apple-touch-icon-6.1.5.png"
+    />
+    <link
+      rel="apple-touch-icon-precomposed"
+      sizes="180x180"
+      href="./apple-touch-icon-6.1.5.png"
+    />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+    <meta
+      name="app-version"
+      content="<?= (typeof appVersion !== 'undefined' ? String(appVersion).replace(/[<>]/g, '') : 'unknown') ?>"
+    />
+    <title>
+      <?= (typeof appName !== 'undefined' ? String(appName).replace(/[<>]/g, '')
+      : 'Jornada') ?>
+    </title>
+    <?!= include_('Styles'); ?>
+  </head>
+  <body>
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="quantum-loader quantum-loader--overlay" aria-hidden="true">
+        <i class="quantum-particle"></i><i class="quantum-particle"></i
+        ><i class="quantum-particle"></i> <i class="quantum-particle"></i
+        ><i class="quantum-particle"></i><i class="quantum-particle"></i>
+        <i class="quantum-particle"></i><i class="quantum-particle"></i
+        ><i class="quantum-particle"></i> <i class="quantum-particle"></i
+        ><i class="quantum-particle"></i><i class="quantum-particle"></i>
+        <i class="quantum-particle"></i>
+      </div>
+      <p>A carregar o sistema…</p>
+    </div>
+        <section id="loginScreen" class="login-screen hidden">
+      <div class="login-shell">
+        <div class="login-brand-panel" aria-hidden="true">
+          <div class="login-brand-content">
+            <div class="brand-mark-wrap" style="margin-bottom: 24px;">
+              <div class="brand-mark"><span class="material-symbols-rounded">skillet</span></div>
+            </div>
+            <strong class="login-group-name">Grupo House 190</strong>
+            <span class="eyebrow">PORTAL INTERNO DE EQUIPES</span>
+            <h1>Bora fazer<br />um bom dia.</h1>
+            <p>
+              Ponto, escalas, folgas e tarefas operacionais. Entre para acompanhar sua jornada e cuidar de cada turno.
+            </p>
+            <div class="login-feature">
+              <span class="material-symbols-rounded">assignment_ind</span><span>Gestão integrada de todas as unidades</span>
+            </div>
+            <div class="login-feature">
+              <span class="material-symbols-rounded">calendar_month</span><span>Escalas e folgas em tempo real</span>
+            </div>
+            <div class="login-feature">
+              <span class="material-symbols-rounded">task_alt</span><span>Tarefas com fotos comprobatórias</span>
+            </div>
+            <div class="login-feature">
+              <span class="material-symbols-rounded">storefront</span><span>Loja de recompensas da equipe</span>
+            </div>
+          </div>
+        </div>
+        <div class="login-form-panel">
+          <form id="loginForm" class="login-card">
+            <div class="mobile-login-brand">
+              <div class="brand-mark brand-mark--sm"><span class="material-symbols-rounded">skillet</span></div>
+              <div class="login-brand-copy">
+                <strong>Grupo House 190</strong>
+                <span>Folgas 3.0</span>
+              </div>
+              <div class="login-status-badge ms-auto"><span class="status-pulse-dot"></span> Online</div>
+            </div>
+            <span class="eyebrow">
+              <span class="material-symbols-rounded eyebrow-icon">lock</span>
+              ACESSO AO SISTEMA
+            </span>
+            <h2>Entre na sua área</h2>
+            <p class="login-subtext">
+              Escala, folgas, ponto e tarefas do seu turno.
+            </p>
+            <label for="loginEmail" class="form-label-wrap">
+              <span>E-mail</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">mail</span>
+                <input
+                  id="loginEmail"
+                  type="email"
+                  autocomplete="username"
+                  placeholder="seuemail@exemplo.com"
+                  required />
+              </div>
+            </label>
+            <label for="loginPassword" class="form-label-wrap">
+              <span>Senha</span>
+              <div class="input-icon password-field">
+                <span class="material-symbols-rounded">lock</span>
+                <input
+                  id="loginPassword"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="Digite sua senha"
+                  required />
+                <button
+                  id="togglePassword"
+                  type="button"
+                  class="password-toggle"
+                  aria-label="Mostrar senha">
+                  <span class="material-symbols-rounded">visibility</span>
+                </button>
+              </div>
+            </label>
+            <div class="login-options-row">
+              <label class="custom-check">
+                <input id="rememberLogin" type="checkbox" checked />
+                <span>Manter conectado</span>
+              </label>
+              <button id="forgotPasswordBtn" type="button" class="btn-link">
+                Esqueci a senha
+              </button>
+            </div>
+            <button class="btn btn-primary login-submit btn-glow" type="submit">
+              Entrar no portal
+            </button>
+            <div class="login-divider">
+              <span>ou continue com</span>
+            </div>
+            <button id="googleLoginBtn" type="button" class="btn btn-google">
+              <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              <span>Entrar com Conta Google</span>
+            </button>
+            <p id="loginError" class="login-error hidden"></p>
+            <p class="login-version">Folgas 3.0 &middot; CozinhaFlow v1.5.0 &middot; <button type="button" id="forcePwaUpdateBtn" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;">Atualizar PWA</button> &middot; <button type="button" onclick="openPrivacyPolicyDialog()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;">Privacidade (LGPD)</button></p>
+          </form>
+          <form id="resetPasswordForm" class="login-card hidden">
+            <button
+              id="resetPasswordBack"
+              class="reset-password-back"
+              type="button">
+              &larr; Voltar ao login
+            </button>
+            <span class="eyebrow">
+              <span class="material-symbols-rounded eyebrow-icon">lock_reset</span>
+              RECUPERAÇÃO SEGURA
+            </span>
+            <h2>Crie uma nova senha</h2>
+            <p class="reset-password-hint">
+              Digite o código enviado ao seu e-mail. A senha atual só será
+              alterada depois da confirmação.
+            </p>
+            <label for="resetPasswordEmail" class="form-label-wrap">
+              <span>E-mail</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">mail</span>
+                <input
+                  id="resetPasswordEmail"
+                  type="email"
+                  autocomplete="username"
+                  required />
+              </div>
+            </label>
+            <label for="resetPasswordCode" class="form-label-wrap">
+              <span>Código</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">pin</span>
+                <input
+                  id="resetPasswordCode"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="one-time-code"
+                  maxlength="13"
+                  placeholder="ABC123-DEF456"
+                  required />
+              </div>
+            </label>
+            <label for="resetPasswordNew" class="form-label-wrap">
+              <span>Nova senha</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">lock_reset</span>
+                <input
+                  id="resetPasswordNew"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  required />
+              </div>
+            </label>
+            <label for="resetPasswordConfirm" class="form-label-wrap">
+              <span>Confirmar nova senha</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">lock_clock</span>
+                <input
+                  id="resetPasswordConfirm"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  required />
+              </div>
+            </label>
+            <small class="reset-password-policy">
+              Use 10 caracteres e pelo menos três tipos entre maiúscula,
+              minúscula, número e símbolo.
+            </small>
+            <button class="btn btn-primary login-submit btn-glow" type="submit">
+              Confirmar nova senha
+            </button>
+            <button
+              id="resetPasswordResend"
+              class="btn btn-ghost"
+              type="button">
+              Reenviar codigo
+            </button>
+            <p id="resetPasswordError" class="login-error hidden"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+    <section id="unauthorized" class="auth-state hidden">
+      <div class="auth-card">
+        <div class="brand-mark">GF</div>
+        <h1>Acesso indisponível</h1>
+        <p id="unauthorizedMessage">Não foi possível iniciar a aplicação.</p>
+        <button class="btn btn-primary" onclick="location.reload()">
+          Tentar novamente
+        </button>
+      </div>
+    </section>
+
+    <div id="app" class="app-shell hidden">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-head">
+          <div class="brand-logo" aria-label="Grupo House 190"></div>
+          <div class="brand-copy">
+            <strong>Folgas 3.0</strong><span>Grupo House 190</span>
+          </div>
+          <button id="sidebarToggle" class="icon-btn" aria-label="Fechar menu">
+            ✕
+          </button>
+        </div>
+        <nav class="nav-list" aria-label="Navegação principal">
+          <details class="nav-group" open>
+            <summary><span>●</span>Operação</summary>
+            <button class="nav-item active" data-view="dashboard"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></svg></span><b>Início</b></button>
+            <button class="nav-item" data-view="timeclock"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><b>Ponto</b></button>
+            <button class="nav-item permission-manager" data-view="live-team"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M17 4a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5v2"/></svg></span><b>Equipe agora</b></button>
+            <button class="nav-item" data-view="tasks" type="button"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a5 5 0 0 1 5 5v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v2a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3v-2H6a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V7a5 5 0 0 1 5-5Z"/><path d="M9 10h6"/></svg></span><b>CozinhaFlow &amp; Loja</b></button>
+            <button class="nav-item" data-view="pending-center" type="button"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="17" rx="3"/><path d="M9 3h6M8 10h8m-8 5h5"/></svg></span><b>Pendências</b><em id="pendingCenterBadge" class="nav-badge">0</em></button>
+            <button class="nav-item" data-view="takeat-credit"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="7.01" y2="15"/><line x1="11" y1="15" x2="13" y2="15"/></svg></span><b id="takeatCreditNavLabel">Contas a Prazo</b></button>
+            <button class="nav-item" data-view="documents"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span><b>Documentos</b><em id="documentsNavBadge" class="nav-badge hidden">0</em></button>
+          </details>
+          <details class="nav-group" open>
+            <summary><span>▦</span>Escalas</summary>
+            <button class="nav-item" data-view="calendar"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-14 4h3m4 0h3"/></svg></span><b>Calendário</b></button>
+            <button class="nav-item" data-view="timeoff"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg></span><b>Folgas</b></button>
+            <button class="nav-item" data-view="shift-plan"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M10 10v11M3 16h18"/></svg></span><b>Escala</b></button>
+            <button class="nav-item permission-manager" data-view="scheduler"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2 6 7 3-7 2-2 7-3-7-6-2 6-3Z"/></svg></span><b>Geração automática</b></button>
+          </details>
+          <details class="nav-group permission-manager" open>
+            <summary><span>♙</span>Pessoas</summary>
+            <button class="nav-item permission-manager" data-view="employees"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3"/></svg></span><b>Funcionários</b></button>
+            <button class="nav-item permission-admin" data-view="hour-balances"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6h5"/></svg></span><b>Banco de horas</b></button>
+            <button class="nav-item" data-view-target="pending-center" data-open-vacations="true"><span>☀</span><b>Férias</b></button>
+          </details>
+          <details class="nav-group" open>
+            <summary><span>⚙</span><b id="managementGroupLabel">Gestão</b></summary>
+            <button class="nav-item permission-manager" data-view="stores"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 2-6h14l2 6M3 9v3h18V9M5 12v9h14v-9M9 21v-6h6v6"/></svg></span><b>Lojas</b></button>
+            <button class="nav-item permission-manager" data-view="holidays"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 3 6 6 1-4 5 1 6-6-3-6 3 1-6-4-5 6-1Z"/></svg></span><b>Feriados</b></button>
+            <button class="nav-item permission-manager" data-view="operations"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg></span><b>Regras</b></button>
+            <button class="nav-item" data-view="communication"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v13H9l-5 4Z"/><path d="M8 8h8m-8 5h5"/></svg></span><b>Comunicação</b><em id="notificationBadge" class="nav-badge">0</em></button>
+            <button class="nav-item" data-view="whistleblower"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></span><b>Canal de Denúncias</b></button>
+            <button class="nav-item permission-manager" data-view="monthly-closing"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8m-8 5h4m-4 4 2 2 6-6"/></svg></span><b>Fechamento mensal</b></button>
+            <button class="nav-item permission-manager" data-view="advanced-reports"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3v18h17M8 16v-5m5 5V7m5 9V4"/></svg></span><b>Jornada e desempenho</b></button>
+            <button class="nav-item permission-manager" data-view="reports"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3v18h17M8 16v-5m5 5V7m5 9V4"/></svg></span><b>Relatórios</b></button>
+          </details>
+          <details class="nav-group permission-admin">
+            <summary><span>◇</span>Administração</summary>
+            <button class="nav-item permission-admin" data-view="access"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/></svg></span><b>Acessos e permissões</b></button>
+            <button class="nav-item permission-admin" data-view="governance"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h17l-4-4M21 17H4l4 4"/></svg></span><b>Delegações</b></button>
+            <button class="nav-item permission-admin" data-view="audit"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l4 4v14H5Z"/><path d="M9 11h7m-7 4h7"/></svg></span><b>Auditoria</b></button>
+            <button class="nav-item permission-admin" data-view="whatsapp"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span><b>Conexão WhatsApp</b></button>
+            <button class="nav-item permission-admin" data-view="asaas-billing"><span class="w-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg></span><b>Financeiro &amp; Asaas</b></button>
+          </details>
+        </nav>
+        <div class="sidebar-foot">
+          <button type="button" class="nav-item" onclick="openPrivacyPolicyDialog()">
+            <span>§</span><b>Privacidade (LGPD)</b></button
+          ><button id="themeToggle" class="nav-item">
+            <span>◐</span><b>Alternar tema</b></button
+          ><button id="logoutBtn" class="nav-item">
+            <span>↪</span><b>Sair</b>
+          </button>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="mobileMenu" class="icon-btn mobile-only">☰</button>
+            <div>
+              <p id="breadcrumb">Grupo House 190 / Início</p>
+              <h1 id="pageTitle">Início</h1>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button
+              id="copilotOpenBtn"
+              class="copilot-topbar-btn"
+              title="Copiloto House 190"
+              aria-label="Abrir Copiloto House 190"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+              </svg>
+              <span class="copilot-btn-label">Copiloto</span>
+            </button>
+            <button
+              id="notificationTopBtn"
+              class="icon-btn notification-top-btn"
+              title="Notificações"
+              aria-label="Abrir notificações"
+            >
+              <svg
+                class="notification-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
+                ></path>
+                <path d="M10 21h4"></path></svg
+              ><em id="notificationTopBadge" class="nav-badge">0</em></button
+            ><button
+              class="app-download-btn"
+              id="appDownloadBtn"
+              title="Instalar aplicativo"
+              aria-label="Instalar aplicativo"
+            >
+              <span class="app-download-icon" aria-hidden="true"
+                ><svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M12 3v11m0 0-4-4m4 4 4-4"></path>
+                  <path d="M5 18.5h14"></path></svg
+              ></span>
+              <span class="app-download-copy"
+                ><strong>Instalar app</strong
+                ><small>Abrir como aplicativo</small></span
+              >
+              <span class="app-download-arrow" aria-hidden="true"
+                >›</span
+              ></button
+            ><button
+              class="icon-btn quantum-refresh"
+              id="refreshBtn"
+              title="Atualizar"
+              aria-label="Atualizar dados"
+            >
+              <span class="refresh-glyph" aria-hidden="true"
+                ><svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path>
+                  <path
+                    d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"
+                  ></path></svg></span
+              ><span
+                class="quantum-loader quantum-loader--small"
+                aria-hidden="true"
+                ><i class="quantum-particle"></i><i class="quantum-particle"></i
+                ><i class="quantum-particle"></i><i class="quantum-particle"></i
+                ><i class="quantum-particle"></i><i class="quantum-particle"></i
+                ><i class="quantum-particle"></i><i class="quantum-particle"></i
+                ><i class="quantum-particle"></i><i class="quantum-particle"></i
+                ><i class="quantum-particle"></i><i class="quantum-particle"></i
+                ><i class="quantum-particle"></i
+              ></span></button
+            ><button
+              type="button"
+              id="profileMenuBtn"
+              class="user-menu"
+              title="Abrir meu perfil"
+              aria-label="Abrir meu perfil"
+            >
+              <div id="userAvatar" class="avatar">U</div>
+              <div class="user-menu-copy">
+                <strong id="userName">Utilizador</strong
+                ><span id="userRole">Perfil</span>
+              </div>
+              <span class="user-menu-chevron" aria-hidden="true">⌄</span>
+            </button>
+          </div>
+        </header>
+
+        <nav class="mobile-dock" aria-label="Acessos rápidos"><div class="dock-indicator" id="dockIndicator"></div><button type="button" data-view-target="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></svg><span>Início</span></button><button type="button" data-view-target="timeclock" class="dock-point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Ponto</span></button><button type="button" data-view-target="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Tarefas</span></button><button type="button" data-view-target="timeoff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg><span>Folgas</span></button><button type="button" data-view-target="takeat-credit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="7.01" y2="15"/><line x1="11" y1="15" x2="13" y2="15"/></svg><span id="dockTakeatLabel">Consumo</span></button></nav><main class="content">
+          <aside id="notificationPromptBanner" class="notif-prompt-banner hidden" role="region" aria-label="Aviso de notificações">
+            <div class="notif-banner-compact">
+              <div class="notif-banner-compact-left">
+                <span id="notifBannerPlatformBadge" class="notif-platform-badge">AVISO</span>
+                <div class="notif-banner-compact-text">
+                  <strong id="notifBannerTitle">Ativar notificações</strong>
+                  <p id="notifBannerDesc">Receba avisos de folgas aprovadas, intervalo e ponto.</p>
+                </div>
+              </div>
+              <div class="notif-banner-compact-right">
+                <button id="notifBannerActionBtn" type="button" class="btn btn-primary notif-compact-btn">
+                  <span id="notifBannerActionLabel">Ativar</span>
+                </button>
+                <button id="notifBannerDismissBtn" type="button" class="notif-compact-dismiss" aria-label="Fechar aviso">✕</button>
+              </div>
+            </div>
+            <button id="notifBannerHelpBtn" type="button" class="notif-compact-help hidden">
+              Como instalar no iPhone ↗
+            </button>
+          </aside>
+          <section id="view-live-team" class="view permission-manager"><div id="journeyTeam"></div></section>
+          <section id="view-shift-plan" class="view"><div id="journeySchedule"></div></section>
+          <section id="view-tasks" class="view"><div id="tasksApp"></div></section>
+          <section id="view-dashboard" class="view active">
+            <div class="hero-row">
+              <div>
+                <span class="eyebrow">VISÃO GERAL</span>
+                <h2 id="greeting">Olá! Vamos organizar a escala?</h2>
+                <p>O que precisa da sua atenção agora.</p>
+              </div>
+              <div class="hero-actions">
+                <button class="btn btn-secondary" data-view-target="calendar">
+                  Ver calendário</button
+                ><button class="btn btn-primary" id="dashboardNewTimeOff">
+                  ＋ Criar folga
+                </button>
+              </div>
+            </div>
+            <div id="googleLinkAlertBanner" class="google-link-banner hidden" role="region" aria-label="Aviso de Login com Google">
+              <div class="google-link-banner-inner">
+                <div class="google-link-banner-icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                  </svg>
+                </div>
+                <div class="google-link-banner-body">
+                  <span class="google-link-banner-badge" style="display:none;">Novo</span>
+                  <strong class="google-link-banner-title">Login rápido com Google</strong>
+                  <p class="google-link-banner-text">Vincule para acessar em 1 clique.</p>
+                </div>
+                <div class="google-link-banner-actions">
+                  <button type="button" id="googleLinkBannerActionBtn" class="btn-google-banner-action">
+                    <span>Vincular</span>
+                  </button>
+                  <button type="button" id="googleLinkBannerDismissBtn" class="btn-google-banner-dismiss" aria-label="Dispensar aviso">✕</button>
+                </div>
+              </div>
+            </div>
+            <div id="journeyHome" class="journey-bento"></div>
+            <div id="incompletePunchesAlert" class="incomplete-punches-alert hidden">
+              <div class="incomplete-alert-content">
+                <span class="incomplete-alert-icon"><span class="material-symbols-rounded">warning</span></span>
+                <div class="incomplete-alert-text">
+                  <strong id="incompletePunchesTitle">Saídas esquecidas detectadas</strong>
+                  <p id="incompletePunchesDesc">Há colaboradores sem registro de saída em dias anteriores.</p>
+                </div>
+              </div>
+              <button type="button" id="incompletePunchesActionBtn" class="incomplete-alert-btn">Ajustar agora</button>
+            </div>
+            <div id="docHomeAlertBanner" class="incomplete-punches-alert hidden" style="border-left-color: #6366f1; background: rgba(99, 102, 241, 0.08);">
+              <div class="incomplete-alert-content">
+                <span class="incomplete-alert-icon" style="color: #6366f1;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                <div class="incomplete-alert-text">
+                  <strong id="docHomeAlertTitle" style="color: #4338ca;">Documentos aguardando assinatura</strong>
+                  <p id="docHomeAlertDesc">Consulte e assine seus documentos pelo celular com segurança jurídica.</p>
+                </div>
+              </div>
+              <button type="button" class="incomplete-alert-btn" style="background: #4f46e5; color: #fff;" data-view-target="documents">Assinar agora</button>
+            </div>
+            <div id="cards" class="metric-grid"></div>
+            <div class="home-shortcuts home-primary-actions"><button class="btn btn-primary" data-view-target="timeclock">◉ Bater ponto</button><button class="btn btn-secondary" data-view-target="tasks">CozinhaFlow &amp; Loja</button><button class="btn btn-secondary" data-view-target="pending-center">Resolver pendências</button><button class="btn btn-secondary" data-view-target="documents">Meus Documentos</button></div><div id="proxima-folga"></div>
+            <article id="liveStorePresencePanel" class="panel live-presence-panel permission-manager" style="margin-bottom: 16px;">
+              <div class="panel-head" style="margin-bottom: 12px;">
+                <div>
+                  <span class="eyebrow">OPERAÇÃO AO VIVO</span>
+                  <h3>Equipe agora</h3>
+                </div>
+                <div class="live-presence-head-actions">
+                  <span id="livePresenceSummaryBadge" class="live-presence-badge">Atualizando…</span>
+                  <button id="livePresenceRefreshBtn" class="btn btn-ghost" type="button" style="padding: 4px 8px; font-size: 12px;">↻</button>
+                </div>
+              </div>
+              <div class="presence-controls"><label>Loja<select id="presenceStoreFilter"><option value="">Todas as lojas</option></select></label><label>Buscar na equipe<input id="presenceSearch" type="search" placeholder="Nome ou função" /></label></div>
+              <div id="presenceFilters" class="presence-filters" aria-label="Filtrar situação"></div>
+              <div id="livePresenceGrid" class="live-presence-grid">
+                <div class="data-sync-message"><span></span>Carregando presença da equipe…</div>
+              </div>
+            <button id="presenceMore" type="button" class="btn btn-secondary presence-more">Ver equipe completa</button>
+            </article>
+            <div class="dashboard-grid">
+              <article class="panel">
+                <div class="panel-head">
+                  <div>
+                    <span class="eyebrow">ATENÇÃO</span>
+                    <h3>Pedidos pendentes</h3>
+                  </div>
+                  <div class="dashboard-pending-head-actions">
+                    <span id="pendingCount" class="count-pill">0</span>
+                    <button
+                      class="btn btn-ghost"
+                      data-view-target="pending-center"
+                    >
+                      Ver central →
+                    </button>
+                  </div>
+                </div>
+                <div id="dashboardRequests" class="activity-list"></div>
+              </article>
+              <article class="panel span-2">
+                <div class="panel-head">
+                  <div>
+                    <span class="eyebrow">PRÓXIMOS DIAS</span>
+                    <h3>Próximas folgas</h3>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Funcionário</th>
+                        <th>Loja</th>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="upcomingBody"></tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section id="view-calendar" class="view">
+            <div class="section-toolbar">
+              <div class="segmented">
+                <button id="calendarPrev">‹</button
+                ><button id="calendarToday">Hoje</button
+                ><button id="calendarNext">›</button>
+              </div>
+              <h2 id="calendarTitle"></h2>
+              <div class="toolbar-actions">
+                <div class="segmented calendar-view-switch" aria-label="Visualização do calendário">
+                  <button type="button" data-calendar-mode="month" aria-pressed="true">Mês</button>
+                  <button type="button" data-calendar-mode="week" aria-pressed="false">Semana</button>
+                  <button type="button" data-calendar-mode="list" aria-pressed="false">Lista</button>
+                </div>
+                <select id="calendarStoreFilter">
+                  <option value="">Todas as lojas</option></select
+                ><select id="calendarEmployeeFilter">
+                  <option value="">Todos os funcionários</option></select
+                ><button id="calendarWhatsAppBtn" class="btn btn-secondary" style="color:#25D366; font-weight:600"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px;">chat</span>WhatsApp</button><button id="calendarPdfBtn" class="btn btn-secondary">
+                  ⇩ PDF</button
+                ><button id="calendarNewBtn" class="btn btn-primary">
+                  ＋ Nova folga
+                </button>
+              </div>
+            </div>
+            <div class="calendar-layout">
+              <div class="calendar-main panel">
+                <div class="calendar-weekdays">
+                  <span>Dom</span><span>Seg</span><span>Ter</span
+                  ><span>Qua</span><span>Qui</span><span>Sex</span
+                  ><span>Sáb</span>
+                </div>
+                <div id="calendarGrid" class="calendar-grid"></div>
+              </div>
+              <aside class="calendar-side panel">
+                <h3>Legenda</h3>
+                <div class="legend">
+                  <span><i class="dot purple"></i>Aprovada</span
+                  ><span><i class="dot amber"></i>Pendente</span
+                  ><span><i class="dot blue"></i>Folga fixa</span
+                  ><span><i class="dot red"></i>Conflito</span>
+                </div>
+                <hr />
+                <h3>Resumo da visualização</h3>
+                <div id="calendarSummary" class="summary-list"></div>
+              </aside>
+            </div>
+          </section>
+
+          <section id="view-timeoff" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">REGISTOS</span>
+                <h2>Folgas</h2>
+              </div>
+              <div class="toolbar-actions">
+                <input
+                  id="timeOffSearch"
+                  class="search-input"
+                  placeholder="Pesquisar funcionário…"
+                /><select id="timeOffStatusFilter">
+                  <option value="">Todos os status</option>
+                  <option>Pendente</option>
+                  <option>Aprovada</option>
+                  <option>Rejeitada</option>
+                  <option>Cancelada</option></select
+                ><button id="timeOffSwapBtn" class="btn btn-secondary" type="button" title="Trocar folga com colega">
+                  ⇄ Trocar folga
+                </button
+                ><button id="newTimeOffBtn" class="btn btn-primary">
+                  ＋ Nova folga
+                </button>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Funcionário</th>
+                      <th>Loja</th>
+                      <th>Período</th>
+                      <th>Tipo</th>
+                      <th>Origem</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="timeOffBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section
+            id="view-pending-center"
+            class="view advanced-view pending-center-view"
+          >
+            <div class="section-toolbar pending-center-hero">
+              <div>
+                <span class="eyebrow" id="pendingCenterEyebrow"
+                  >CENTRAL OPERACIONAL</span
+                >
+                <h2 id="pendingCenterTitle">Pendências</h2>
+                <p id="pendingCenterSubtitle">
+                  Tudo que precisa da sua atenção em um só lugar.
+                </p>
+              </div>
+              <div class="pending-hero-actions">
+                <button
+                  id="pendingNewTimeOff"
+                  class="btn btn-primary"
+                  type="button"
+                >
+                  ＋ Pedir folga
+                </button>
+                <button
+                  id="pendingRefreshBtn"
+                  class="btn btn-secondary"
+                  type="button"
+                >
+                  ↻ Atualizar
+                </button>
+              </div>
+            </div>
+
+            <div
+              class="pending-summary-grid"
+              role="region"
+              aria-label="Resumo da central"
+            >
+              <article class="pending-summary-card is-total">
+                <span class="pending-summary-icon">◷</span>
+                <div>
+                  <strong id="pendingTotalMetric">0</strong
+                  ><small>Aguardando</small>
+                </div>
+              </article>
+              <article class="pending-summary-card is-timeoff">
+                <span class="pending-summary-icon">✓</span>
+                <div>
+                  <strong id="pendingTimeOffMetric">0</strong
+                  ><small>Folgas</small>
+                </div>
+              </article>
+              <article class="pending-summary-card is-clock">
+                <span class="pending-summary-icon">⌁</span>
+                <div>
+                  <strong id="pendingClockMetric">0</strong
+                  ><small>Ajustes de ponto</small>
+                </div>
+              </article>
+              <article class="pending-summary-card is-swaps">
+                <span class="pending-summary-icon">⇄</span>
+                <div>
+                  <strong id="pendingSwapMetric">0</strong><small>Trocas</small>
+                </div>
+              </article>
+            </div>
+
+            <div
+              class="pending-filter-bar"
+              role="tablist"
+              aria-label="Filtrar central"
+            >
+              <button
+                class="pending-filter-btn active"
+                data-pending-filter="all"
+                type="button"
+              >
+                Todas
+              </button>
+              <button
+                class="pending-filter-btn"
+                data-pending-filter="timeoff"
+                type="button"
+              >
+                Folgas <em id="pendingTimeOffFilterCount">0</em>
+              </button>
+              <button
+                class="pending-filter-btn"
+                data-pending-filter="clock"
+                type="button"
+              >
+                Ponto <em id="pendingClockFilterCount">0</em>
+              </button>
+              <button
+                class="pending-filter-btn"
+                data-pending-filter="swaps"
+                type="button"
+              >
+                Trocas <em id="pendingSwapFilterCount">0</em>
+              </button>
+            </div>
+
+            <div class="pending-center-content">
+              <section class="pending-category" data-pending-category="timeoff">
+                <div class="pending-category-head">
+                  <div class="pending-category-heading">
+                    <span class="pending-category-icon timeoff">✓</span>
+                    <div>
+                      <span class="eyebrow">FOLGAS</span>
+                      <h3 id="pendingTimeOffTitle">Pedidos de folga</h3>
+                      <p id="pendingTimeOffDescription">
+                        Analise solicitações enviadas pela equipe.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    id="pendingTimeOffAction"
+                    class="btn btn-primary"
+                    type="button"
+                  >
+                    ＋ Pedir folga
+                  </button>
+                </div>
+                <div id="requestCards" class="request-grid"></div>
+                <div class="pending-related-tools permission-manager">
+                  <details>
+                    <summary>Cobertura e substituição de folga</summary>
+                    <div class="pending-inline-tool">
+                      <label
+                        >Folga aprovada<select id="substituteTimeOff"></select
+                      ></label>
+                      <button
+                        id="substituteSuggestBtn"
+                        class="btn btn-secondary"
+                        type="button"
+                      >
+                        Sugerir substitutos
+                      </button>
+                      <div
+                        id="substituteResult"
+                        class="feature-result empty-state"
+                      >
+                        Escolha uma folga aprovada.
+                      </div>
+                    </div>
+                  </details>
+                </div>
+                <div class="pending-related-tools">
+                  <details id="vacationTool">
+                    <summary>Férias CLT — solicitar e acompanhar</summary>
+                    <form
+                      id="vacationForm"
+                      class="pending-inline-tool vacation-inline-tool"
+                    >
+                      <label
+                        >Funcionário<select
+                          id="vacationEmployee"
+                          required
+                        ></select
+                      ></label>
+                      <label
+                        >Início<input
+                          id="vacationStart"
+                          type="date"
+                          required
+                        />
+                      </label>
+                      <label
+                        >Fim<input id="vacationEnd" type="date" required />
+                      </label>
+                      <label
+                        >Parcela<input
+                          id="vacationInstallment"
+                          type="number"
+                          min="1"
+                          max="3"
+                          value="1"
+                          required
+                        />
+                      </label>
+                      <label
+                        >Total de parcelas<input
+                          id="vacationInstallments"
+                          type="number"
+                          min="1"
+                          max="3"
+                          value="1"
+                          required
+                        />
+                      </label>
+                      <label
+                        >Abono (dias)<input
+                          id="vacationAllowance"
+                          type="number"
+                          min="0"
+                          max="10"
+                          value="0"
+                          required
+                        />
+                      </label>
+                      <label class="vacation-wide"
+                        >Observações<textarea
+                          id="vacationNotes"
+                          rows="2"
+                          maxlength="1000"
+                        ></textarea>
+                      </label>
+                      <div class="vacation-actions">
+                        <button class="btn btn-primary" type="submit">
+                          Solicitar férias
+                        </button>
+                        <button
+                          id="vacationRefreshBtn"
+                          class="btn btn-secondary"
+                          type="button"
+                        >
+                          Atualizar lista
+                        </button>
+                      </div>
+                      <div
+                        id="vacationResult"
+                        class="feature-result empty-state"
+                      >
+                        Nenhuma solicitação carregada.
+                      </div>
+                    </form>
+                  </details>
+                </div>
+              </section>
+
+              <section class="pending-category" data-pending-category="clock">
+                <div class="pending-category-head">
+                  <div class="pending-category-heading">
+                    <span class="pending-category-icon clock">⌁</span>
+                    <div>
+                      <span class="eyebrow">PONTO</span>
+                      <h3 id="pendingClockTitle">Ajustes de ponto</h3>
+                      <p id="pendingClockDescription">
+                        Revise divergências e solicitações de correção.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    id="pendingClockAction"
+                    class="btn btn-secondary"
+                    type="button"
+                  >
+                    Abrir meu ponto
+                  </button>
+                </div>
+                <div id="clockAdjustmentCards" class="request-grid"></div>
+              </section>
+
+              <section class="pending-category" data-pending-category="swaps">
+                <div class="pending-category-head">
+                  <div class="pending-category-heading">
+                    <span class="pending-category-icon swaps">⇄</span>
+                    <div>
+                      <span class="eyebrow">TROCAS</span>
+                      <h3>Trocas de folga</h3>
+                      <p>
+                        Acompanhe cada solicitação até o aceite e a decisão
+                        final.
+                      </p>
+                    </div>
+                  </div>
+                  <button id="newSwapBtn" class="btn btn-primary" type="button">
+                    ＋ Solicitar troca
+                  </button>
+                </div>
+                <div
+                  class="swap-flow"
+                  role="group"
+                  aria-label="Etapas da troca de folga"
+                >
+                  <span><b>1</b> Solicitação</span><i>→</i>
+                  <span><b>2</b> Aceite do colega</span><i>→</i>
+                  <span><b>3</b> Decisão do gestor</span>
+                </div>
+                <div id="swapCards" class="request-grid swap-grid"></div>
+              </section>
+
+              <section
+                class="pending-category"
+                data-pending-category="onboarding"
+              >
+                <div class="pending-category-head">
+                  <div class="pending-category-heading">
+                    <span class="pending-category-icon documents">✓</span>
+                    <div>
+                      <span class="eyebrow">INTEGRAÇÃO</span>
+                      <h3 id="pendingDocumentsTitle">Onboarding da equipe</h3>
+                      <p id="pendingDocumentsDescription">
+                        Acompanhe a integração dos funcionários.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="pending-related-tools permission-manager">
+                  <details>
+                    <summary>Acompanhar onboarding de funcionário</summary>
+                    <div class="pending-inline-tool">
+                      <label
+                        >Funcionário<select id="onboardingEmployee"></select
+                      ></label>
+                      <button
+                        id="onboardingLoadBtn"
+                        class="btn btn-secondary"
+                        type="button"
+                      >
+                        Ver progresso
+                      </button>
+                      <div
+                        id="onboardingResult"
+                        class="feature-result empty-state"
+                      >
+                        Selecione um funcionário.
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </section>
+              <section
+                class="pending-category"
+                data-pending-category="documents"
+              >
+                <div class="pending-category-head">
+                  <div class="pending-category-heading">
+                    <span class="pending-category-icon" style="background: rgba(99,102,241,0.15); color: #6366f1;"><span class="material-symbols-rounded" style="font-size:18px;">description</span></span>
+                    <div>
+                      <span class="eyebrow">DOCUMENTOS E ASSINATURAS</span>
+                      <h3 id="pendingDocumentsSignTitle">Meus Documentos &amp; Holerites</h3>
+                      <p id="pendingDocumentsSignDesc">
+                        Consulte e assine eletronicamente seus contratos, termos e holerites.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="pending-category-actions">
+                    <button
+                      class="btn btn-secondary"
+                      data-view-target="documents"
+                      type="button"
+                    >
+                      Acessar Documentos ↗
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+          <section id="view-timeclock" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">JORNADA</span>
+                <h2>Controle de ponto</h2>
+                <p>
+                  Registre sua jornada, acompanhe as marcações e peça uma correção quando precisar.
+                </p>
+              </div>
+              <div class="toolbar-actions permission-team-read">
+                <input id="clockMonth" type="month" /><select
+                  id="clockEmployeeFilter"
+                >
+                  <option value="">Todos os funcionários</option></select
+                ><button
+                  id="clockExportBtn"
+                  class="btn btn-secondary permission-manager"
+                >
+                  Gerar planilha mensal
+                </button>
+                <button
+                  id="clockManualPunchBtn"
+                  class="btn btn-primary permission-admin"
+                  type="button"
+                >
+                  ＋ Lançar ponto
+                </button>
+                <button
+                  id="clockRepairDuplicatesBtn"
+                  class="btn btn-secondary permission-admin"
+                  type="button"
+                >
+                  Corrigir pontos duplicados
+                </button>
+              </div>
+            </div>
+            <div id="clockPrimaryLayout" class="clock-layout">
+              <article class="panel clock-punch-card">
+                <div class="clock-punch-summary">
+                  <span class="eyebrow">AGORA</span>
+                  <div id="clockLiveTime" class="clock-live-time">--:--</div>
+                  <p id="clockLocationHint">
+                    Confirme sua foto e localização para registrar o ponto na unidade.
+                  </p>
+                </div>
+                <div class="clock-punch-actions">
+                  <button
+                    id="clockPunchBtn"
+                    class="btn btn-primary clock-punch-btn"
+                  >
+                    Carregando ponto…</button
+                  ><button
+                    id="clockSkipBreakBtn"
+                    class="btn btn-secondary clock-skip-break-btn hidden"
+                    type="button"
+                  >
+                    Não tirar descanso</button
+                  ><button id="clockRefreshBtn" class="btn btn-ghost">
+                    ↻ Atualizar
+                  </button>
+                </div>
+              </article>
+              <article id="clockTodayPanel" class="panel">
+                <div class="panel-head">
+                  <div>
+                    <span class="eyebrow">HOJE</span>
+                    <h3>Marcações da jornada</h3>
+                  </div>
+                </div>
+                <div id="clockTodayList" class="clock-timeline"></div>
+              </article>
+            </div>
+            <div class="metric-grid clock-metrics">
+              <div class="metric-card">
+                <span>Trabalhado no mês</span
+                ><strong id="clockWorkedMetric">0h 00min</strong>
+              </div>
+              <div class="metric-card">
+                <span>Previsto no mês</span
+                ><strong id="clockExpectedMetric">0h 00min</strong>
+              </div>
+              <div class="metric-card">
+                <span>Saldo acumulado</span
+                ><strong id="clockBalanceMetric">0h 00min</strong>
+                <small id="clockMonthBalanceSubtitle" style="display:block; font-size:11px; color:var(--muted); font-weight:500; margin-top:3px;"></small>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="panel-head clock-history-head">
+                <div>
+                  <span class="eyebrow">ESPELHO</span>
+                  <h3>Registros do dia</h3>
+                  <p id="clockDaySummary">Mostrando somente o dia selecionado.</p>
+                </div>
+                <div class="clock-day-picker" aria-label="Selecionar dia do ponto">
+                  <button
+                    id="clockDownloadMirrorPdfBtn"
+                    class="btn btn-secondary clock-print-mirror-btn"
+                    type="button"
+                    style="font-size:12.5px; padding:6px 12px; border-radius:10px; display:inline-flex; align-items:center; gap:6px;"
+                    title="Baixar ou imprimir o Espelho de Ponto Oficial deste mês (Portaria MTP nº 671/2021)"
+                  >
+                    📄 Espelho de Ponto (Portaria 671)
+                  </button>
+                  <button
+                    id="clockSignMirrorBtn"
+                    class="btn btn-primary clock-sign-mirror-btn"
+                    type="button"
+                    style="font-size:12.5px; padding:6px 14px; border-radius:10px; display:inline-flex; align-items:center; gap:6px; font-weight:600;"
+                    title="Conferir e assinar digitalmente o Espelho de Ponto Oficial deste mês (Portaria MTP nº 671/2021)"
+                  >
+                    Assinar espelho digitalmente
+                  </button>
+                  <span id="clockMirrorSignedBadge" class="badge badge-success hidden" style="font-size:11px; padding:5px 9px; border-radius:8px; display:inline-flex; align-items:center; gap:4px; font-weight:600;"></span>
+                  <label for="clockDayFilter">Dia exibido</label>
+                  <div>
+                    <button
+                      id="clockPrevDayBtn"
+                      class="btn btn-secondary clock-nav-day-btn"
+                      type="button"
+                      aria-label="Dia anterior"
+                      title="Dia anterior"
+                    >
+                      ‹
+                    </button>
+                    <input id="clockDayFilter" type="date" />
+                    <button
+                      id="clockNextDayBtn"
+                      class="btn btn-secondary clock-nav-day-btn"
+                      type="button"
+                      aria-label="Próximo dia"
+                      title="Próximo dia"
+                    >
+                      ›
+                    </button>
+                    <button
+                      id="clockTodayBtn"
+                      class="btn btn-secondary clock-today-btn"
+                      type="button"
+                    >
+                      Hoje
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Funcionário</th>
+                      <th>Data</th>
+                      <th>Entrada</th>
+                      <th>Intervalo</th>
+                      <th>Retorno</th>
+                      <th>Saída</th>
+                      <th>Trabalhado</th>
+                      <th>Saldo</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="clockHistoryBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-absences" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">GESTÃO DE EQUIPE</span>
+                <h2>Ausências e Justificativas</h2>
+                <p>
+                  Acompanhe faltas operacionais, analise atestados médicos e lance justificativas para o banco de horas.
+                </p>
+              </div>
+              <div class="toolbar-actions permission-manager">
+                <input id="absencesMonth" type="month" aria-label="Mês de apuração das ausências" />
+                <select id="absencesStoreFilter" aria-label="Filtrar ausências por unidade">
+                  <option value="">Todas as unidades</option>
+                </select>
+                <select id="absencesStatusFilter" aria-label="Filtrar por status da ausência">
+                  <option value="all">Todas as ausências</option>
+                  <option value="pending" selected>Faltas a justificar</option>
+                  <option value="justified">Atestados e justificadas</option>
+                </select>
+                <button id="absencesRefreshBtn" class="btn btn-secondary" type="button" aria-label="Atualizar lista de ausências">
+                  ↻ Atualizar
+                </button>
+                <button id="absencesNewBtn" class="btn btn-primary" type="button">
+                  ＋ Nova justificativa
+                </button>
+              </div>
+            </div>
+            <div class="metric-grid absences-metrics">
+              <div class="metric-card absences-card-pending">
+                <span>Faltas a justificar</span>
+                <strong id="absencesPendingMetric">0</strong>
+                <small>Impactando saldo de horas</small>
+              </div>
+              <div class="metric-card absences-card-justified">
+                <span>Ausências justificadas</span>
+                <strong id="absencesJustifiedMetric">0</strong>
+                <small>Saldo zerado sem prejuízo</small>
+              </div>
+              <div class="metric-card absences-card-medical">
+                <span>Atestados médicos</span>
+                <strong id="absencesMedicalMetric">0</strong>
+                <small>Comprovados no período</small>
+              </div>
+              <div class="metric-card absences-card-total">
+                <span>Total de ausências</span>
+                <strong id="absencesTotalMetric">0</strong>
+                <small id="absencesPeriodSummary">No mês selecionado</small>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="panel-head">
+                <div>
+                  <span class="eyebrow">HISTÓRICO OPERACIONAL</span>
+                  <h3 id="absencesListTitle">Faltas e justificativas apuradas</h3>
+                  <p id="absencesListSummary">Filtrando ausências do mês selecionado.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Colaborador</th>
+                      <th>Unidade</th>
+                      <th>Data da ausência</th>
+                      <th>Escala prevista</th>
+                      <th>Situação</th>
+                      <th>Motivo / Observação</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="absencesTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-hour-balances" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">ADMINISTRAÇÃO</span>
+                <h2>Saldo de horas dos funcionários</h2>
+                <p>Consulte o acumulado de toda a equipe e registre ajustes com histórico.</p>
+              </div>
+              <div class="toolbar-actions">
+                <label class="hour-balance-month-label">Até o mês
+                  <input id="adminHourBalanceMonth" type="month" />
+                </label>
+                <button id="adminHourBalanceRefresh" class="btn btn-secondary" type="button">↻ Atualizar</button>
+                <button id="adminHourBalanceSettleBtn" class="btn btn-primary" type="button"><span class="material-symbols-rounded">balance</span> Fechar / Quitar Mês</button>
+                <button id="adminResetStoreBalancesBtn" class="btn btn-secondary" type="button" style="border-color:rgba(239,68,68,0.4);color:#ef4444"><span class="material-symbols-rounded">delete_outline</span> Zerar Saldos da Loja</button>
+              </div>
+            </div>
+            <div class="metric-grid admin-hour-balance-metrics">
+              <div class="metric-card">
+                <span>Funcionários</span><strong id="adminHourBalanceCount">0</strong>
+              </div>
+              <button id="adminHourBalanceTotalCard" class="metric-card critical-metric" type="button" aria-pressed="false">
+                <span>Saldo total até o mês selecionado</span><strong id="adminHourBalanceTotal">0h 00min</strong><small>Clique para detalhar os saldos negativos</small>
+              </button>
+              <div class="metric-card">
+                <span>Pendências</span><strong id="adminHourBalancePending">0</strong>
+              </div>
+            </div>
+            <div class="panel table-panel admin-hour-balance-panel">
+              <div class="panel-head">
+                <div>
+                  <span class="eyebrow">EQUIPE</span>
+                  <h3>Banco de horas individual</h3>
+                </div>
+                <label class="admin-hour-balance-search">Buscar funcionário
+                  <input id="adminHourBalanceSearch" type="search" placeholder="Digite o nome ou a loja" />
+                </label>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr>
+                    <th>Funcionário</th><th>Loja</th><th>Trabalhado</th><th>Previsto</th><th>Ajustes</th><th>Pendências</th><th>Saldo</th><th></th>
+                  </tr></thead>
+                  <tbody id="adminHourBalanceBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-takeat-credit" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow" id="takeatViewEyebrow">TAKEAT · CONSUMO INTERNO</span>
+                <h2 id="takeatViewTitle">Contas a Prazo &amp; Vales</h2>
+                <p id="takeatViewSubtitle">Acompanhe o saldo devedor, limites de crédito e consumo dos colaboradores nas 3 lojas em tempo real.</p>
+              </div>
+              <div class="toolbar-actions">
+                <select id="takeatStoreFilter">
+                  <option value="all">Todas as unidades</option>
+                  <option value="teixeira">House 190 Teixeira</option>
+                  <option value="eunapolis">House 190 Eunápolis</option>
+                  <option value="foodpark">House Foodpark</option>
+                </select>
+                <button id="takeatCreditRefreshBtn" class="btn btn-secondary" type="button">↻ Sincronizar Takeat</button>
+                <button id="takeatCreditExportBtn" class="btn btn-primary" type="button">Exportar CSV</button>
+              </div>
+            </div>
+            <div class="metric-grid">
+              <div class="metric-card">
+                <span id="takeatMetric1Label">Total Devedor em Aberto</span>
+                <strong id="takeatTotalDebtMetric" style="color: #ef4444;">R$ 0,00</strong>
+              </div>
+              <div class="metric-card">
+                <span id="takeatMetric2Label">Contas com Débito Ativo</span>
+                <strong id="takeatCountWithDebtMetric">0</strong>
+              </div>
+              <div class="metric-card">
+                <span id="takeatMetric3Label">Limite Total Cadastrado</span>
+                <strong id="takeatTotalLimitMetric">R$ 0,00</strong>
+                <small id="takeatMetric3Sub" style="font-size:11px; color:var(--text-muted); display:none;">Economia de R$ 0,00</small>
+              </div>
+              <div class="metric-card">
+                <span id="takeatMetric4Label">Status da Integração</span>
+                <strong id="takeatSyncStatusMetric" style="color: #10b981;">Online</strong>
+              </div>
+            </div>
+            <div id="takeatEmployeeCardsContainer" style="display:none; padding:1rem 1rem 6rem; flex-direction:column; gap:0.85rem;"></div>
+            <div class="panel table-panel">
+              <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+                <div id="takeatFilterControls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+                  <input id="takeatCreditSearch" class="search-input" placeholder="Pesquisar por colaborador, conta ou telefone…" style="min-width:240px;" />
+                  <label style="display:inline-flex; align-items:center; gap:0.35rem; font-size:13px; cursor:pointer; margin:0;">
+                    <input type="checkbox" id="takeatOnlyDebtCheckbox" checked /> Apenas com débito
+                  </label>
+                </div>
+                <div id="takeatLastSyncTime" style="font-size:12px; color:var(--text-muted, #64748b);"></div>
+              </div>
+              <div id="takeatTableWrap" class="table-wrap" style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+                <table style="min-width:760px;">
+                  <thead>
+                    <tr>
+                      <th>Conta / Colaborador</th>
+                      <th>Unidade</th>
+                      <th id="takeatMappingTh">Vínculo no Folgas 3.0</th>
+                      <th>Limite</th>
+                      <th>Saldo Devedor</th>
+                      <th>Com 20% Desc.</th>
+                      <th>Uso do Limite</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="takeatCreditBody">
+                    <tr><td colspan="8" style="text-align:center; padding:2rem;">Carregando contas a prazo da Takeat…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-documents" class="view">
+            <div class="doc-view-header">
+              <div class="doc-view-header-main">
+                <span class="eyebrow hidden" id="docViewEyebrow"></span>
+                <h2 id="docViewTitle">Meus Documentos</h2>
+                <span id="docPendingCounterChip" class="doc-pending-chip hidden"></span>
+              </div>
+              <p id="docViewSubtitle" class="doc-view-subtitle hidden"></p>
+            </div>
+            <div id="documentsAppRoot"></div>
+          </section>
+          <section id="view-whistleblower" class="view">
+            <div id="whistleblowerAppRoot"></div>
+          </section>
+          <section id="view-scheduler" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">AUTOMAÇÃO</span>
+                <h2>Geração automática</h2>
+                <p>Distribua folgas conforme saldo, dias fixos e capacidade.</p>
+              </div>
+            </div>
+            <div class="scheduler-grid">
+              <form id="schedulerForm" class="panel form-panel">
+                <h3>Configurar distribuição</h3>
+                <div class="form-grid">
+                  <label
+                    >Loja<select id="schedulerStore" required>
+                      <option value="">Selecione</option>
+                    </select></label
+                  ><label
+                    >Mês<input
+                      id="schedulerMonth"
+                      type="month"
+                      required /></label
+                  ><label
+                    >Máximo de folgas por dia<input
+                      id="schedulerMaxPerDay"
+                      type="number"
+                      min="1"
+                      value="1" /></label
+                  ><label
+                    >Mínimo trabalhando<input
+                      id="schedulerMinWorking"
+                      type="number"
+                      min="0"
+                      value="1"
+                  /></label>
+                </div>
+                <div class="check-grid">
+                  <label
+                    ><input id="schedulerUseBalance" type="checkbox" checked />
+                    Usar saldo de folgas</label
+                  ><label
+                    ><input id="schedulerFixedDays" type="checkbox" checked />
+                    Priorizar folgas fixas</label
+                  ><label
+                    ><input id="schedulerWeekends" type="checkbox" /> Permitir
+                    fins de semana</label
+                  ><label
+                    ><input
+                      id="schedulerDeductBalance"
+                      type="checkbox"
+                      checked
+                    />
+                    Baixar saldo ao confirmar</label
+                  >
+                </div>
+                <div class="form-actions">
+                  <button
+                    type="button"
+                    id="clearSimulationBtn"
+                    class="btn btn-ghost"
+                  >
+                    Limpar</button
+                  ><button type="submit" class="btn btn-primary">
+                    ✦ Simular distribuição</button
+                  ><button
+                    type="button"
+                    id="aiSimulateBtn"
+                    class="btn btn-secondary"
+                  >
+                    <span class="material-symbols-rounded">auto_awesome</span> Otimizar distribuição
+                  </button>
+                </div>
+              </form>
+              <article class="panel scheduler-help">
+                <span class="feature-icon">✦</span>
+                <h3>Distribuição equilibrada</h3>
+                <p>
+                  O motor considera saldo, folgas fixas, histórico, limites da
+                  loja e conflitos existentes.
+                </p>
+                <ul>
+                  <li>Prioridade explicável por pontuação</li>
+                  <li>Visualização em tabela e calendário</li>
+                  <li>Ajustes antes da confirmação</li>
+                </ul>
+              </article>
+            </div>
+            <div id="simulationArea" class="hidden">
+              <div id="simulationAIHint" class="ai-hint hidden"></div>
+              <div class="section-toolbar compact">
+                <div>
+                  <h3>Resultado da simulação</h3>
+                  <p id="simulationSummary"></p>
+                </div>
+                <div class="toolbar-actions">
+                  <button
+                    id="simulationTableView"
+                    class="btn btn-secondary active"
+                  >
+                    Tabela</button
+                  ><button
+                    id="simulationCalendarView"
+                    class="btn btn-secondary"
+                  >
+                    Calendário</button
+                  ><button id="simulationPdfBtn" class="btn btn-secondary">
+                    ⇩ PDF</button
+                  ><button id="confirmSimulationBtn" class="btn btn-primary">
+                    Confirmar e gravar
+                  </button>
+                </div>
+              </div>
+              <div id="simulationTablePanel" class="panel table-panel">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th></th>
+                        <th>Funcionário</th>
+                        <th>Data</th>
+                        <th>Folga fixa</th>
+                        <th>Saldo</th>
+                        <th>Pontuação</th>
+                        <th>Motivo</th>
+                        <th id="simulationAIColumnHead" class="hidden">
+                          Análise IA
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="simulationBody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="simulationCalendarPanel" class="panel hidden">
+                <div class="calendar-weekdays">
+                  <span>Dom</span><span>Seg</span><span>Ter</span
+                  ><span>Qua</span><span>Qui</span><span>Sex</span
+                  ><span>Sáb</span>
+                </div>
+                <div id="simulationCalendarGrid" class="calendar-grid"></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="view-employees" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">NOSSA EQUIPE</span>
+                <h2>Funcionários</h2>
+              </div>
+              <div class="toolbar-actions">
+                <input
+                  id="employeeSearch"
+                  class="search-input"
+                  placeholder="Pesquisar…"
+                /><select id="employeeStoreFilter">
+                  <option value="">Todas as lojas</option></select
+                ><button id="newEmployeeBtn" class="btn btn-primary">
+                  ＋ Novo funcionário
+                </button>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="table-wrap">
+                <table class="employee-table">
+                  <thead>
+                    <tr>
+                      <th style="min-width: 190px;">Funcionário</th>
+                      <th style="min-width: 130px;">Loja</th>
+                      <th style="min-width: 120px;">Cargo</th>
+                      <th style="min-width: 100px;">Perfil</th>
+                      <th style="width: 65px; text-align: center;">Saldo</th>
+                      <th style="min-width: 110px;">Folgas fixas</th>
+                      <th style="min-width: 160px;">Status</th>
+                      <th class="col-actions" style="min-width: 110px; width: 110px; text-align: right;">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="employeeBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-stores" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">ESTRUTURA</span>
+                <h2>Lojas</h2>
+              </div>
+              <button id="newStoreBtn" class="btn btn-primary">
+                ＋ Nova loja
+              </button>
+            </div>
+            <div id="storeCards" class="store-grid"></div>
+          </section>
+          <section id="view-holidays" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">CALENDÁRIO</span>
+                <h2>Feriados</h2>
+              </div>
+              <button id="newHolidayBtn" class="btn btn-primary">
+                ＋ Novo feriado
+              </button>
+            </div>
+            <div class="panel table-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Feriado</th>
+                      <th>Data</th>
+                      <th>Tipo</th>
+                      <th>Loja</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="holidayBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-access" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">SEGURANÇA</span>
+                <h2>Acessos e permissões</h2>
+                <p>Gerencie perfis, vínculos e estado de acesso.</p>
+              </div>
+              <button id="newAccessBtn" class="btn btn-primary">
+                ＋ Criar acesso
+              </button>
+            </div>
+            <div class="access-metrics">
+              <div class="metric-card">
+                <span>Utilizadores ativos</span
+                ><strong id="activeUsersMetric">0</strong>
+              </div>
+              <div class="metric-card">
+                <span>Administradores</span
+                ><strong id="adminUsersMetric">0</strong>
+              </div>
+              <div class="metric-card">
+                <span>Bloqueados</span
+                ><strong id="blockedUsersMetric">0</strong>
+              </div>
+              <div class="metric-card">
+                <span style="display:inline-flex;align-items:center;gap:5px;">
+                  <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                  Migrados p/ Google
+                </span>
+                <strong id="googleUsersMetric">0</strong>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Utilizador</th>
+                      <th>Perfil</th>
+                      <th>Loja</th>
+                      <th>Último acesso</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="accessBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-operations" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">CAPACIDADE</span>
+                <h2>Regras operacionais</h2>
+                <p>
+                  Defina limite de folgas e equipe mínima por loja, cargo e dia.
+                </p>
+              </div>
+              <div class="toolbar-actions">
+                <button id="newOperationalRuleBtn" class="btn btn-primary">
+                  ＋ Nova regra
+                </button>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Loja</th>
+                      <th>Cargo</th>
+                      <th>Dia</th>
+                      <th>Limite de folgas</th>
+                      <th>Mínimo trabalhando</th>
+                      <th>Modo</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="operationalRulesBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <section id="view-notifications" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">CENTRAL</span>
+                <h2>Avisos e lembretes</h2>
+              </div>
+              <button id="refreshNotificationsBtn" class="btn btn-secondary">
+                ↻ Atualizar
+              </button>
+            </div>
+            <section class="panel push-settings" aria-labelledby="pushHeading">
+              <div><span class="eyebrow">NO SEU CELULAR</span><h3 id="pushHeading">Seu turno, no horário certo</h3><p id="pushStatus" role="status">Verificando notificações…</p></div>
+              <div class="push-options"><label><input id="pushClock" type="checkbox" checked /> Lembrar entrada e saída do ponto</label><label><input id="pushBreak" type="checkbox" checked /> Avisar 5 minutos antes de terminar o intervalo e na hora de voltar</label><label><input id="pushNotices" type="checkbox" checked /> Receber novos avisos e respostas a solicitações</label></div>
+              <p class="push-note">O intervalo conta a partir da sua marcação, usando a duração da sua jornada. Os avisos não registram ponto por você.</p>
+              <div class="toolbar-actions"><button id="pushEnable" type="button" class="btn btn-primary">Ativar neste celular</button><button id="pushTest" type="button" class="btn btn-secondary" disabled>Enviar teste</button><button id="pushDisable" type="button" class="btn btn-ghost" disabled>Desativar</button></div>
+            </section>
+            <div class="notice-toolbar"><button id="noticeUnread" class="btn btn-secondary" type="button" aria-pressed="true">Somente não lidos</button><button id="noticeAllRead" class="btn btn-ghost" type="button">Marcar todos como lidos</button></div>
+            <div id="notificationsList" class="activity-list panel"></div>
+          </section>
+
+          <section id="view-communication" class="view advanced-view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">EQUIPE</span>
+                <h2>Comunicação</h2>
+                <p>Comunicados e enquetes em um só lugar.</p>
+              </div>
+              <button id="communicationRefreshBtn" class="btn btn-secondary">
+                ↻ Atualizar
+              </button>
+              <button class="btn btn-secondary" data-view-target="notifications"><span class="material-symbols-rounded">notifications</span> Meus avisos</button>
+            </div>
+            <div class="advanced-grid">
+              <form
+                id="announcementForm"
+                class="panel feature-panel permission-manager"
+              >
+                <span class="feature-icon">◈</span>
+                <h3>Novo comunicado</h3>
+                <label>Título<input id="announcementTitle" required /></label
+                ><label
+                  >Mensagem<textarea
+                    id="announcementMessage"
+                    required
+                  ></textarea>
+                </label>
+                <div class="form-grid">
+                  <label>Loja<select id="announcementStore"></select></label
+                  ><label
+                    >Público<select id="announcementAudience">
+                      <option value="TODOS">Todos</option>
+                      <option value="FUNCIONARIOS">Funcionários</option>
+                      <option value="GESTORES">Gestores</option>
+                    </select></label
+                  >
+                </div>
+                <label
+                  >Validade<input
+                    id="announcementExpiresAt"
+                    type="datetime-local"
+                /></label>
+                <label class="switch-label"
+                  ><input
+                    id="announcementRequiresConfirmation"
+                    type="checkbox"
+                    checked
+                  />
+                  Exigir confirmação de leitura</label
+                >
+                <label class="switch-label"
+                  ><input
+                    id="announcementSendWhatsApp"
+                    type="checkbox"
+                  />
+                  Disparar também para o WhatsApp dos colaboradores</label
+                >
+                <button class="btn btn-primary" type="submit">Publicar</button>
+              </form>
+              <form
+                id="pollForm"
+                class="panel feature-panel permission-manager"
+              >
+                <span class="feature-icon">▥</span>
+                <h3>Nova enquete</h3>
+                <label>Pergunta<input id="pollQuestion" required /></label>
+                <div class="poll-options-field">
+                  <div class="poll-options-head">
+                    <label>Opções</label
+                    ><span id="pollOptionCount">2 de 10</span>
+                  </div>
+                  <div id="pollOptionList" class="poll-option-list"></div>
+                  <button
+                    id="pollAddOption"
+                    class="btn btn-ghost poll-add-option"
+                    type="button"
+                  >
+                    ＋ Adicionar outra opção
+                  </button>
+                  <small>Você pode criar de 2 a 10 alternativas.</small>
+                </div>
+                <label>Loja<select id="pollStore"></select></label
+                ><label
+                  >Encerrar em<input
+                    id="pollClosesAt"
+                    type="datetime-local" /></label
+                ><button class="btn btn-primary" type="submit">
+                  Criar enquete
+                </button>
+              </form>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <span class="eyebrow">MURAL</span>
+                  <h3>Comunicados ativos</h3>
+                </div>
+              </div>
+              <div id="announcementList" class="communication-feed empty-state">
+                Carregando comunicados…
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <span class="eyebrow">PARTICIPE</span>
+                  <h3>Enquetes abertas</h3>
+                </div>
+              </div>
+              <div id="pollList" class="communication-feed empty-state">
+                Carregando enquetes…
+              </div>
+            </div>
+          </section>
+
+          <section id="view-monthly-closing" class="view advanced-view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">FOLHA</span>
+                <h2>Fechamento mensal</h2>
+                <p>
+                  Feche o período, consulte o histórico e reabra com
+                  justificativa.
+                </p>
+              </div>
+              <div class="toolbar-actions">
+                <select id="closingStore"></select
+                ><input id="closingMonth" type="month" /><button
+                  id="closingRunBtn"
+                  class="btn btn-primary"
+                >
+                  Fechar mês
+                </button>
+              </div>
+            </div>
+            <div class="metric-grid">
+              <div class="metric-card">
+                <span>Período selecionado</span
+                ><strong id="closingPeriodMetric">—</strong>
+              </div>
+              <div class="metric-card">
+                <span>Status</span
+                ><strong id="closingStatusMetric">Aberto</strong>
+              </div>
+            </div>
+            <div class="panel table-panel">
+              <div class="panel-head">
+                <h3>Histórico de fechamentos</h3>
+                <button id="closingRefreshBtn" class="btn btn-secondary">
+                  ↻ Atualizar
+                </button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mês</th>
+                      <th>Loja</th>
+                      <th>Funcionários</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="closingBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="view-advanced-reports" class="view advanced-view">
+            <div class="home-shortcuts"><button class="btn btn-secondary" data-view-target="timeclock">Conferir registros de ponto</button><button class="btn btn-secondary permission-admin" data-view-target="hour-balances">Consultar banco de horas</button><button class="btn btn-secondary" data-view-target="monthly-closing">Fechar o mês</button></div>
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">INTELIGÊNCIA</span>
+                <h2>Jornada e desempenho</h2>
+                <p>Assiduidade, banco de horas e exportação AFD.</p>
+              </div>
+            </div>
+            <div class="advanced-grid">
+              <div class="panel feature-panel">
+                <span class="feature-icon">★</span>
+                <h3>Ranking de assiduidade</h3>
+                <label>Loja<select id="attendanceStore"></select></label
+                ><label>Mês<input id="attendanceMonth" type="month" /></label
+                ><button id="attendanceLoadBtn" class="btn btn-primary">
+                  Gerar ranking
+                </button>
+                <div id="attendanceResult" class="feature-result"></div>
+              </div>
+              <form id="afdForm" class="panel feature-panel permission-admin">
+                <span class="feature-icon">⇩</span>
+                <h3>Exportar AFD</h3>
+                <label>Loja<select id="afdStore" required></select></label>
+                <div class="form-grid">
+                  <label
+                    >Início<input id="afdStart" type="date" required /></label
+                  ><label>Fim<input id="afdEnd" type="date" required /></label>
+                </div>
+                <button class="btn btn-primary" type="submit">
+                  Gerar arquivo AFD
+                </button>
+                <div id="afdResult" class="feature-result"></div>
+              </form>
+              <form id="hourCompensationForm" class="panel feature-panel">
+                <span class="feature-icon">◷</span>
+                <h3>Compensar com banco de horas</h3>
+                <label
+                  >Funcionário<select
+                    id="hourCompensationEmployee"
+                    required
+                  ></select
+                ></label>
+                <div class="form-grid">
+                  <label
+                    >Data<input
+                      id="hourCompensationDate"
+                      type="date"
+                      required /></label
+                  ><label
+                    >Horas<input
+                      id="hourCompensationHours"
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      required
+                  /></label>
+                </div>
+                <button class="btn btn-primary" type="submit">
+                  Compensar folga
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section id="view-governance" class="view advanced-view">
+            <div class="home-shortcuts"><button class="btn btn-secondary" data-view-target="access">Gerenciar acessos</button><button class="btn btn-secondary" data-view-target="audit">Histórico de alterações</button></div>
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">SEGURANÇA</span>
+                <h2>Delegações</h2>
+                <p>Delegações temporárias de perfil e ações administrativas.</p>
+              </div>
+            </div>
+            <div class="advanced-grid">
+              <form id="delegationForm" class="panel feature-panel">
+                <span class="feature-icon">♢</span>
+                <h3>Delegar perfil</h3>
+                <label
+                  >E-mail<input
+                    id="delegationEmail"
+                    type="email"
+                    required /></label
+                ><label
+                  >Perfil<select id="delegationProfile">
+                    <option>Administrador</option>
+                    <option>Responsável de loja</option>
+                  </select></label
+                >
+                <label
+                  >Loja para o perfil responsável<select
+                    id="delegationStore"
+                  ></select
+                ></label>
+                <div class="form-grid">
+                  <label
+                    >Início<input
+                      id="delegationStart"
+                      type="datetime-local"
+                      required /></label
+                  ><label
+                    >Fim<input
+                      id="delegationEnd"
+                      type="datetime-local"
+                      required
+                  /></label>
+                </div>
+                <label
+                  >Motivo<textarea
+                    id="delegationReason"
+                    required
+                  ></textarea></label
+                ><button class="btn btn-primary" type="submit">
+                  Criar delegação
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section id="view-reports" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">ANÁLISE</span>
+                <h2>Relatórios</h2><p>Escolha um período e abra os registros que compõem cada indicador.</p>
+              </div>
+              <div class="toolbar-actions">
+                <label>Período da análise<input id="reportPeriod" type="month" /></label><button id="exportCsvBtn" class="btn btn-secondary">
+                  ⇩ CSV completo</button
+                ><button id="exportPdfBtn" class="btn btn-primary">
+                  ⇩ PDF completo
+                </button>
+              </div>
+            </div>
+            <div id="reportCards" class="metric-grid"></div><div id="reportPendingDetails" class="panel hidden"></div>
+            <div class="panel">
+              <div class="panel-head"><h3 id="reportYearLabel">Início das folgas por mês</h3></div>
+              <div id="reportChart" class="large-chart"></div><p class="w-footnote">Aprovadas, pendentes e concluídas por data de início. Toque em um mês para detalhar.</p>
+            </div><div class="panel"><div class="panel-head"><h3>Distribuição por unidade</h3></div><div id="reportStoreBreakdown"></div>
+            </div><div class="panel"><div class="panel-head"><h3>Conferência de horas</h3></div><p>O banco acumula desde a primeira entrada válida de cada funcionário. Confira jornada cadastrada, dias sem ponto e ajustes antes do fechamento.</p><div class="w-actions"><button class="btn btn-primary permission-admin" data-view-target="hour-balances">Detalhar banco de horas</button><button class="btn btn-secondary" data-view-target="advanced-reports">Jornada e desempenho</button><button class="btn btn-secondary" data-view-target="monthly-closing">Fechar mês</button></div>
+            </div>
+          </section>
+          <section id="view-audit" class="view">
+            <div class="section-toolbar">
+              <div>
+                <span class="eyebrow">HISTÓRICO</span>
+                <h2>Auditoria</h2>
+              </div>
+              <button id="refreshAuditBtn" class="btn btn-secondary">
+                ↻ Atualizar
+              </button>
+            </div>
+            <div class="panel table-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Utilizador</th>
+                      <th>Ação</th>
+                      <th>Módulo</th>
+                      <th>Registo</th>
+                      <th>Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="view-whatsapp" class="view">
+            <!-- Top Toolbar -->
+            <div class="section-toolbar" style="margin-bottom:18px;">
+              <div>
+                <span class="eyebrow">INTEGRAÇÃO & MENSAGERIA</span>
+                <h2>Conexão WhatsApp</h2>
+                <p>Painel oficial de notificações ativas, comunicados em massa e automações do Grupo House 190.</p>
+              </div>
+              <button id="refreshWhatsAppStatusBtn" type="button" class="btn btn-secondary" style="min-height:42px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Atualizar status
+              </button>
+            </div>
+
+            <!-- Header Status Card (Sempre Visível) -->
+            <div class="panel" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:18px 22px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 2px 10px rgba(15,23,42,0.03); margin-bottom:22px;">
+              <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:48px; height:48px; border-radius:14px; background:#f0fdf4; border:1px solid #bbf7d0; display:flex; align-items:center; justify-content:center; color:#16a34a; flex-shrink:0;">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <strong style="font-size:15px; color:#0f172a;">Instância <span id="waInstanceNameText">house190</span></strong>
+                    <span id="waStatusBadge" class="badge badge-warning">Carregando</span>
+                  </div>
+                  <div style="font-size:13px; color:#64748b; margin-top:3px;">
+                    <span id="waStatusText">Verificando status da instância...</span> · Número: <strong id="waConnectedPhoneText" style="color:#0f172a; font-family:monospace; font-size:13.5px;">---</strong>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <button type="button" id="waBtnDisconnect" class="btn btn-secondary btn-sm" style="min-height:40px; border-radius:10px; color:#ef4444; border-color:#fca5a5; font-weight:600; padding:0 16px;">
+                  Desconectar WhatsApp
+                </button>
+              </div>
+            </div>
+
+            <!-- Segmented Control Apple iOS -->
+            <div class="view-segmented-wrap" style="margin-bottom:22px;">
+              <div class="view-segmented-control" role="tablist" style="background:#f1f5f9; padding:4px; border-radius:14px; border:1px solid #e2e8f0; display:flex; gap:4px;">
+                <button type="button" class="view-tab-btn wa-nav-tab active" data-wa-tab="broadcast" role="tab" aria-selected="true" style="border-radius:10px; font-weight:700; min-height:42px; flex:1;">
+                  Disparar Comunicado
+                </button>
+                <button type="button" class="view-tab-btn wa-nav-tab" data-wa-tab="automations" role="tab" aria-selected="false" style="border-radius:10px; font-weight:600; min-height:42px; flex:1;">
+                  Central de Automações
+                </button>
+                <button type="button" class="view-tab-btn wa-nav-tab" data-wa-tab="connection" role="tab" aria-selected="false" style="border-radius:10px; font-weight:600; min-height:42px; flex:1;">
+                  Pareamento & Gateway
+                </button>
+              </div>
+            </div>
+
+            <!-- TAB 1: Disparar Comunicado & Teste -->
+            <div data-wa-tab-pane="broadcast" style="display:block;">
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+                <!-- Card 1: Broadcast em Massa -->
+                <div class="panel feature-panel" style="grid-column:1 / -1;">
+                  <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                  </span>
+                  <h3>Disparar Comunicado para Todos (WhatsApp)</h3>
+                  <p style="font-size:13px; color:#64748b; margin-bottom:14px;">
+                    Envie um comunicado oficial instantaneamente para o WhatsApp de todos os colaboradores ou filtre por unidade.
+                  </p>
+
+                  <form id="waBroadcastForm">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; margin-bottom:14px;">
+                      <label>
+                        Título do Comunicado
+                        <input id="waBroadcastTitleInput" type="text" placeholder="Ex: Reunião Geral de Equipe / Aviso da Diretoria" required style="font-weight:600; min-height:44px; border-radius:12px;" />
+                      </label>
+                      <label>
+                        Destinatários / Unidade
+                        <select id="waBroadcastStoreSelect" style="min-height:44px; border-radius:12px;">
+                          <option value="TODAS">Toda a Equipe (Todas as Lojas)</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label>
+                      Mensagem do Comunicado
+                      <textarea id="waBroadcastMessageInput" rows="4" placeholder="Escreva a mensagem oficial que será enviada individualmente para o WhatsApp de cada colaborador..." required style="border-radius:12px; font-size:13.5px; line-height:1.5; padding:12px;"></textarea>
+                    </label>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; margin-top:16px; padding-top:14px; border-top:1px solid #f1f5f9;">
+                      <div id="waBroadcastCountBadge" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#334155; font-weight:600; background:#f8fafc; padding:8px 14px; border-radius:12px; border:1px solid #e2e8f0;">
+                        <span id="waBroadcastTargetCount" style="font-weight:800; color:#0284c7;">Calculando</span> colaboradores com WhatsApp ativo
+                      </div>
+                      <button type="submit" id="waBtnSendBroadcast" class="btn btn-primary" style="min-height:44px; padding:0 24px; border-radius:12px; font-weight:700; font-size:14px; background:#0284c7; border-color:#0284c7;">
+                        Disparar para Todos no WhatsApp
+                      </button>
+                    </div>
+                  </form>
+
+                  <div id="waBroadcastFeedbackBox" class="hidden" style="margin-top:14px; padding:12px 16px; border-radius:12px; font-size:13px;"></div>
+                </div>
+
+                <!-- Card 2: Teste de Disparo Rápido -->
+                <div class="panel feature-panel" style="grid-column:1 / -1;">
+                  <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </span>
+                  <h3>Disparo de Teste</h3>
+                  <p style="font-size:13px; color:#64748b; margin-bottom:14px;">Envie uma mensagem de teste imediata para verificar a rota de entrega.</p>
+
+                  <form id="waTestMessageForm">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:14px;">
+                      <label>
+                        Telefone com DDD (ex: 73999887766)
+                        <input id="waTestPhoneInput" type="tel" placeholder="73999887766" required style="font-family:monospace; min-height:44px; border-radius:12px;" />
+                      </label>
+                      <label>
+                        Mensagem de Teste
+                        <input id="waTestMessageInput" type="text" required value="Teste de comunicação e disparo oficial do sistema Grupo House 190 via WhatsApp." style="min-height:44px; border-radius:12px;" />
+                      </label>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                      <button type="submit" id="waBtnSendTest" class="btn btn-primary" style="min-height:44px; padding:0 24px; border-radius:12px; font-weight:600;">
+                        Enviar Notificação de Teste
+                      </button>
+                    </div>
+                  </form>
+
+                  <div id="waTestFeedbackBox" class="hidden" style="margin-top:14px; padding:12px 16px; border-radius:12px; font-size:13px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 2: Central de Automações & Histórico -->
+            <div data-wa-tab-pane="automations" style="display:none;">
+              <form id="waAutomationsForm">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; margin-bottom:20px;">
+                  <!-- Grupo 1: Ponto & Jornada -->
+                  <div class="panel" style="padding:18px; border-radius:16px; background:#ffffff; border:1px solid #e2e8f0;">
+                    <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      Jornada & Ponto
+                    </h4>
+                    <div style="display:grid; gap:8px;">
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Registro de ponto (entrada/saida)</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Confirmação de batidas</small>
+                        </div>
+                        <input type="checkbox" name="aut_ponto" id="aut_ponto" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Espelho de ponto mensal</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Aviso de assinatura pendente</small>
+                        </div>
+                        <input type="checkbox" name="aut_espelho_ponto" id="aut_espelho_ponto" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Grupo 2: Gestão de Folgas -->
+                  <div class="panel" style="padding:18px; border-radius:16px; background:#ffffff; border:1px solid #e2e8f0;">
+                    <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      Gestão de Folgas
+                    </h4>
+                    <div style="display:grid; gap:8px;">
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Folga solicitada</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Notificar gerente responsável</small>
+                        </div>
+                        <input type="checkbox" name="aut_folga_nova" id="aut_folga_nova" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Folga aprovada</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Avisar colaborador</small>
+                        </div>
+                        <input type="checkbox" name="aut_folga_aprovada" id="aut_folga_aprovada" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Folga recusada</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Avisar colaborador com motivo</small>
+                        </div>
+                        <input type="checkbox" name="aut_folga_recusada" id="aut_folga_recusada" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Troca de folga solicitada</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Avisar colega substituto</small>
+                        </div>
+                        <input type="checkbox" name="aut_troca_folga" id="aut_troca_folga" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Grupo 3: Operação & RH -->
+                  <div class="panel" style="padding:18px; border-radius:16px; background:#ffffff; border:1px solid #e2e8f0;">
+                    <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                      Operação & RH
+                    </h4>
+                    <div style="display:grid; gap:8px;">
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Avisos administrativos</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Comunicados gerais do mural</small>
+                        </div>
+                        <input type="checkbox" name="aut_comunicados" id="aut_comunicados" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Documentos e holerites</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Disponibilização de recibos</small>
+                        </div>
+                        <input type="checkbox" name="aut_documentos" id="aut_documentos" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                      <label style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; cursor:pointer; min-height:48px;">
+                        <div>
+                          <strong style="display:block; font-size:13px; color:#1e293b;">Tarefas operacionais</strong>
+                          <small style="color:#64748b; font-size:11.5px;">Atribuição e conclusão</small>
+                        </div>
+                        <input type="checkbox" name="aut_tarefas" id="aut_tarefas" style="width:18px; height:18px; accent-color:#0284c7;">
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-bottom:24px;">
+                  <button type="button" id="waAutomationsReloadBtn" class="btn btn-secondary" style="min-height:42px; border-radius:12px; padding:0 18px; font-weight:600;">
+                    Recarregar
+                  </button>
+                  <button type="submit" class="btn btn-primary" style="min-height:42px; border-radius:12px; padding:0 24px; font-weight:700; background:#0284c7; border-color:#0284c7;">
+                    Salvar Automações
+                  </button>
+                </div>
+              </form>
+
+              <!-- Histórico de Disparos -->
+              <div class="panel" style="padding:20px; border-radius:16px; background:#ffffff; border:1px solid #e2e8f0;">
+                <h4 style="font-size:15px; font-weight:700; color:#0f172a; margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                  Histórico de Disparos Recentes
+                </h4>
+                <div id="waHistoryList" style="font-size:12.5px; color:#64748b; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0; padding:12px 16px; max-height:360px; overflow-y:auto;">
+                  Carregando histórico...
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 3: Pareamento & Gateway -->
+            <div data-wa-tab-pane="connection" style="display:none;">
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+                <!-- Pareamento no Celular -->
+                <div class="panel feature-panel">
+                  <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                  </span>
+                  <h3>Pareamento no Celular</h3>
+                  <p style="font-size:13px; color:#64748b; margin-bottom:14px;">Escaneie o QR Code abaixo ou insira o código de 8 dígitos no WhatsApp oficial da empresa.</p>
+
+                  <div id="waQrCodeWrapper" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.25rem; background:#ffffff; border:2px dashed #cbd5e1; border-radius:16px; margin-bottom:14px; min-height:200px;">
+                    <div id="waQrCodeBox" style="display:flex; align-items:center; justify-content:center; text-align:center;">
+                      <span style="color:#94a3b8; font-size:13px;">Clique em "Gerar QR Code de Conexão" para iniciar</span>
+                    </div>
+                  </div>
+
+                  <div style="display:flex; gap:10px; margin-bottom:12px;">
+                    <button type="button" id="waBtnGenerateQr" class="btn btn-primary" style="flex:1; min-height:44px; border-radius:12px; font-weight:600;">
+                      Gerar QR Code
+                    </button>
+                    <button type="button" id="waBtnConfirmPair" class="btn btn-secondary" style="flex:1; min-height:44px; border-radius:12px; font-weight:600;">
+                      Confirmar Pareamento
+                    </button>
+                  </div>
+
+                  <div style="background:#f1f5f9; padding:12px 14px; border-radius:12px; border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <div>
+                      <small style="color:#64748b; font-size:11px; display:block; text-transform:uppercase; font-weight:700;">Código de Pareamento</small>
+                      <span id="waPairingCodeDisplay" style="font-size:18px; font-weight:800; color:#0f172a; letter-spacing:2px; font-family:monospace;">---- - ----</span>
+                    </div>
+                    <button type="button" id="waBtnCopyCode" class="btn btn-secondary btn-sm" style="border-radius:8px; min-height:36px; padding:0 14px;">Copiar</button>
+                  </div>
+
+                  <button type="button" id="waBtnRequestPairCode" class="btn btn-secondary" style="width:100%; border-radius:12px; font-weight:600; min-height:42px; margin-bottom:12px;">
+                    Solicitar Código de Pareamento por Telefone
+                  </button>
+
+                  <ol style="font-size:12.5px; color:#64748b; margin:8px 0 0 1.25rem; line-height:1.5;">
+                    <li>Abra o WhatsApp no smartphone oficial da loja.</li>
+                    <li>Toque em <strong>Aparelhos Conectados</strong> no menu.</li>
+                    <li>Aponte a câmera para o QR Code ou selecione "Conectar com código".</li>
+                  </ol>
+                </div>
+
+                <!-- Parâmetros do Gateway -->
+                <div class="panel feature-panel">
+                  <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                  </span>
+                  <h3>Parâmetros do Gateway</h3>
+                  <p style="font-size:13px; color:#64748b; margin-bottom:14px;">Configurações técnicas do gateway Baileys / WA-AKG e webhooks receptivos.</p>
+
+                  <form id="waGatewayConfigForm">
+                    <label>
+                      URL da API do Gateway
+                      <input id="waGatewayUrlInput" type="url" placeholder="https://api.whatsapp.house190.com.br" style="min-height:44px; border-radius:12px;" />
+                    </label>
+                    <label>
+                      Nome da Instância
+                      <input id="waGatewayInstanceInput" type="text" placeholder="house190" style="min-height:44px; border-radius:12px;" />
+                    </label>
+                    <label>
+                      Token / API Key
+                      <input id="waGatewayApiKeyInput" type="password" placeholder="Chave de autenticação" style="min-height:44px; border-radius:12px;" />
+                    </label>
+                    <label>
+                      Webhook Receptivo do Sistema
+                      <input id="waSystemWebhookInput" type="text" readonly value="https://gestao.house190.com.br/api/whatsapp/webhook" style="background:#f1f5f9; font-family:monospace; font-size:12px; min-height:44px; border-radius:12px;" />
+                    </label>
+                    <button type="submit" id="waBtnSaveGateway" class="btn btn-secondary" style="width:100%; min-height:44px; border-radius:12px; font-weight:600; margin-top:10px;">
+                      Salvar Parâmetros
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="view-asaas-billing" class="view">
+            <!-- Top Toolbar -->
+            <div class="section-toolbar" style="margin-bottom:18px;">
+              <div>
+                <span class="eyebrow">INTEGRAÇÃO &amp; FATURAMENTO</span>
+                <h2>Financeiro &amp; Asaas</h2>
+                <p>Gestão integrada de assinaturas, cobranças via PIX, Boleto e Cartão, e automação financeira.</p>
+              </div>
+              <button id="refreshAsaasBillingBtn" type="button" class="btn btn-secondary" style="min-height:42px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Atualizar dados
+              </button>
+            </div>
+
+            <!-- Header Status Card -->
+            <div class="panel" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:18px 22px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 2px 10px rgba(15,23,42,0.03); margin-bottom:22px;">
+              <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:48px; height:48px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; display:flex; align-items:center; justify-content:center; color:#2563eb; flex-shrink:0;">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"/>
+                    <line x1="2" y1="10" x2="22" y2="10"/>
+                    <line x1="6" y1="15" x2="10" y2="15"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <strong style="font-size:15px; color:#0f172a;">Gateway Asaas API v3</strong>
+                    <span id="asaasStatusBadge" class="badge badge-warning">Verificando</span>
+                  </div>
+                  <div style="font-size:13px; color:#64748b; margin-top:3px;">
+                    Ambiente: <strong id="asaasEnvText" style="color:#0f172a;">Sandbox</strong> &middot; Chave: <strong id="asaasApiKeyMaskedText" style="font-family:monospace; font-size:13px;">Não configurada</strong>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <button type="button" id="asaasCopyWebhookBtn" class="btn btn-secondary btn-sm" style="min-height:40px; border-radius:10px; font-weight:600; padding:0 14px; display:inline-flex; align-items:center; gap:6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  Copiar Webhook URL
+                </button>
+              </div>
+            </div>
+
+            <!-- Segmented Control Apple iOS -->
+            <div class="view-segmented-wrap" style="margin-bottom:22px;">
+              <div class="view-segmented-control" role="tablist" style="background:#f1f5f9; padding:4px; border-radius:14px; border:1px solid #e2e8f0; display:flex; gap:4px;">
+                <button type="button" class="view-tab-btn asaas-nav-tab active" data-asaas-tab="charges" role="tab" aria-selected="true" style="border-radius:10px; font-weight:700; min-height:42px; flex:1;">
+                  Cobranças &amp; Assinaturas
+                </button>
+                <button type="button" class="view-tab-btn asaas-nav-tab" data-asaas-tab="new-charge" role="tab" aria-selected="false" style="border-radius:10px; font-weight:600; min-height:42px; flex:1;">
+                  Nova Cobrança
+                </button>
+                <button type="button" class="view-tab-btn asaas-nav-tab" data-asaas-tab="config" role="tab" aria-selected="false" style="border-radius:10px; font-weight:600; min-height:42px; flex:1;">
+                  Configuração da API
+                </button>
+              </div>
+            </div>
+
+            <!-- ABA 1: Cobranças & Assinaturas -->
+            <div data-asaas-tab-pane="charges" style="display:block;">
+              <!-- Summary KPIs -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:20px;">
+                <div class="panel" style="padding:16px; border-radius:16px; border:1px solid #e2e8f0; background:#fff;">
+                  <span style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Faturado</span>
+                  <div id="asaasKpiTotalFaturado" style="font-size:24px; font-weight:800; color:#0f172a; margin-top:4px; font-variant-numeric:tabular-nums;">R$ 0,00</div>
+                  <small style="color:#059669; font-size:12px; font-weight:600;">Recebido via Asaas</small>
+                </div>
+                <div class="panel" style="padding:16px; border-radius:16px; border:1px solid #e2e8f0; background:#fff;">
+                  <span style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Cobranças Pendentes</span>
+                  <div id="asaasKpiPendentes" style="font-size:24px; font-weight:800; color:#d97706; margin-top:4px; font-variant-numeric:tabular-nums;">0</div>
+                  <small style="color:#64748b; font-size:12px;">Aguardando liquidação</small>
+                </div>
+                <div class="panel" style="padding:16px; border-radius:16px; border:1px solid #e2e8f0; background:#fff;">
+                  <span style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Assinaturas Ativas</span>
+                  <div id="asaasKpiAssinaturas" style="font-size:24px; font-weight:800; color:#2563eb; margin-top:4px; font-variant-numeric:tabular-nums;">0</div>
+                  <small style="color:#64748b; font-size:12px;">Recorrência mensal</small>
+                </div>
+              </div>
+
+              <!-- Filter and Table Panel -->
+              <div class="panel" style="background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; padding:20px; box-shadow:0 2px 10px rgba(15,23,42,0.03);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+                  <h3 style="margin:0; font-size:16px; font-weight:700; color:#0f172a;">Histórico Recente de Cobranças</h3>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <select id="asaasFilterStatus" class="form-control" style="min-height:38px; border-radius:10px; font-size:13px; padding:0 12px; border:1px solid #cbd5e1;">
+                      <option value="TODOS">Todos os status</option>
+                      <option value="PENDING">Pendentes</option>
+                      <option value="RECEIVED">Recebidos</option>
+                      <option value="CONFIRMED">Confirmados</option>
+                      <option value="OVERDUE">Vencidos</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="table-responsive" style="overflow-x:auto;">
+                  <table class="data-table" style="width:100%; border-collapse:collapse; font-size:14px;">
+                    <thead>
+                      <tr style="border-bottom:2px solid #f1f5f9; text-align:left;">
+                        <th style="padding:12px 14px; font-weight:700; color:#475569;">Data</th>
+                        <th style="padding:12px 14px; font-weight:700; color:#475569;">Cliente / Empresa</th>
+                        <th style="padding:12px 14px; font-weight:700; color:#475569;">Plano</th>
+                        <th style="padding:12px 14px; font-weight:700; color:#475569; font-variant-numeric:tabular-nums;">Valor</th>
+                        <th style="padding:12px 14px; font-weight:700; color:#475569;">Forma</th>
+                        <th style="padding:12px 14px; font-weight:700; color:#475569;">Status</th>
+                        <th style="padding:12px 14px; font-weight:700; color:#475569; text-align:right;">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody id="asaasPaymentsTableBody">
+                      <tr>
+                        <td colspan="7" style="padding:28px; text-align:center; color:#94a3b8;">Nenhuma cobrança registrada ainda.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- ABA 2: Nova Cobrança -->
+            <div data-asaas-tab-pane="new-charge" style="display:none;">
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+                <!-- Form Panel -->
+                <div class="panel" style="background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; padding:24px; box-shadow:0 2px 10px rgba(15,23,42,0.03);">
+                  <h3 style="margin-top:0; margin-bottom:14px; font-size:17px; font-weight:700; color:#0f172a;">Gerar Nova Cobrança ou Assinatura</h3>
+                  <p style="font-size:13px; color:#64748b; margin-bottom:18px;">Emita uma fatura avulsa ou inicie uma assinatura recorrente integrada ao Asaas.</p>
+
+                  <form id="asaasNewPaymentForm">
+                    <!-- Presets de Planos -->
+                    <div style="margin-bottom:16px;">
+                      <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Selecione o Plano Base</label>
+                      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+                        <button type="button" class="btn btn-secondary asaas-plan-preset" data-plano="Start" data-valor="67" style="min-height:40px; font-size:13px; border-radius:10px; font-weight:600;">Start R$ 67</button>
+                        <button type="button" class="btn btn-secondary asaas-plan-preset active" data-plano="Pro" data-valor="127" style="min-height:40px; font-size:13px; border-radius:10px; font-weight:700; border-color:#2563eb; color:#2563eb;">Pro R$ 127</button>
+                        <button type="button" class="btn btn-secondary asaas-plan-preset" data-plano="Enterprise" data-valor="197" style="min-height:40px; font-size:13px; border-radius:10px; font-weight:600;">Enterprise R$ 197</button>
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:14px;">
+                      <label for="asaasClientName" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">Nome do Cliente / Razão Social *</label>
+                      <input type="text" id="asaasClientName" class="form-control" placeholder="Ex.: Padaria Central Ltda" required style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                      <div class="form-group">
+                        <label for="asaasClientCpfCnpj" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">CPF ou CNPJ</label>
+                        <input type="text" id="asaasClientCpfCnpj" class="form-control" placeholder="00.000.000/0001-00" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
+                      </div>
+                      <div class="form-group">
+                        <label for="asaasClientPhone" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">WhatsApp / Telefone</label>
+                        <input type="text" id="asaasClientPhone" class="form-control" placeholder="(71) 99999-9999" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:14px;">
+                      <label for="asaasClientEmail" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">E-mail do Cliente *</label>
+                      <input type="email" id="asaasClientEmail" class="form-control" placeholder="financeiro@empresa.com.br" required style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                      <div class="form-group">
+                        <label for="asaasPaymentValue" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">Valor (R$) *</label>
+                        <input type="number" id="asaasPaymentValue" class="form-control" step="0.01" min="1" value="127" required style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;" />
+                      </div>
+                      <div class="form-group">
+                        <label for="asaasPaymentMethod" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">Forma de Pagamento</label>
+                        <select id="asaasPaymentMethod" class="form-control" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;">
+                          <option value="PIX">PIX (Instantâneo)</option>
+                          <option value="BOLETO">Boleto Bancário</option>
+                          <option value="CREDIT_CARD">Cartão de Crédito</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:18px;">
+                      <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:5px;">Modalidade de Cobrança</label>
+                      <div style="display:flex; gap:16px; align-items:center;">
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:13.5px; cursor:pointer;">
+                          <input type="radio" name="asaasBillingType" value="single" checked /> Cobrança Única / Setup
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:13.5px; cursor:pointer;">
+                          <input type="radio" name="asaasBillingType" value="recurring" /> Assinatura Mensal Recorrente
+                        </label>
+                      </div>
+                    </div>
+
+                    <button type="submit" id="asaasSubmitPaymentBtn" class="btn btn-accent" style="width:100%; min-height:46px; border-radius:12px; font-weight:700; font-size:15px;">
+                      Gerar Cobrança no Asaas
+                    </button>
+                  </form>
+                </div>
+
+                <!-- Result Box (Preenchido após emissão) -->
+                <div id="asaasPaymentResultBox" class="panel" style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:18px; padding:24px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                  <div style="width:52px; height:52px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#64748b; margin-bottom:12px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                  </div>
+                  <h4 style="margin:0 0 6px 0; font-size:15px; font-weight:700; color:#334155;">Nenhuma cobrança gerada nesta sessão</h4>
+                  <p style="margin:0; font-size:13px; color:#64748b; max-width:280px;">Preencha o formulário ao lado para gerar cobrança instantânea com QR Code PIX e link seguro.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ABA 3: Configuração da API -->
+            <div data-asaas-tab-pane="config" style="display:none;">
+              <div class="panel" style="max-width:720px; background:#ffffff; border:1px solid #e2e8f0; border-radius:18px; padding:24px; box-shadow:0 2px 10px rgba(15,23,42,0.03);">
+                <h3 style="margin-top:0; margin-bottom:14px; font-size:17px; font-weight:700; color:#0f172a;">Credenciais &amp; Parâmetros do Asaas</h3>
+                <p style="font-size:13px; color:#64748b; margin-bottom:20px;">
+                  Configure seu token de acesso da API v3 do Asaas. Em ambiente de testes, utilize as chaves geradas em <strong>sandbox.asaas.com</strong>.
+                </p>
+
+                <form id="asaasConfigForm">
+                  <div class="form-group" style="margin-bottom:16px;">
+                    <label for="asaasConfigApiKey" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Chave de API (Access Token) *</label>
+                    <input type="password" id="asaasConfigApiKey" class="form-control" placeholder="$aact_YTU5YTE0M2M6N2Nm..." required style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-family:monospace; font-size:13.5px;" />
+                    <small style="display:block; color:#64748b; font-size:12px; margin-top:4px;">Encontre sua chave no painel Asaas em: Minha Conta &gt; Integrações &gt; Chaves de API.</small>
+                  </div>
+
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;">
+                    <div class="form-group">
+                      <label for="asaasConfigAmbiente" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Ambiente de Execução</label>
+                      <select id="asaasConfigAmbiente" class="form-control" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;">
+                        <option value="sandbox">Sandbox (Ambiente de Testes)</option>
+                        <option value="producao">Produção (Pagamentos Reais)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="asaasConfigEmailNotificacao" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">E-mail para Alertas Financeiros</label>
+                      <input type="email" id="asaasConfigEmailNotificacao" class="form-control" placeholder="financeiro@suaempresa.com" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-size:14px;" />
+                    </div>
+                  </div>
+
+                  <div class="form-group" style="margin-bottom:16px;">
+                    <label for="asaasWebhookUrlDisplay" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">URL de Webhook (Notificação de Pagamentos)</label>
+                    <div style="display:flex; gap:8px;">
+                      <input type="text" id="asaasWebhookUrlDisplay" class="form-control" readonly style="flex:1; min-height:42px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; padding:0 12px; font-family:monospace; font-size:13px; color:#475569;" />
+                      <button type="button" id="asaasBtnCopyWebhookInline" class="btn btn-secondary" style="min-height:42px; border-radius:10px; font-weight:600; padding:0 14px;">Copiar</button>
+                    </div>
+                    <small style="display:block; color:#64748b; font-size:12px; margin-top:4px;">Cadastre esta URL no painel do Asaas em: Minha Conta &gt; Integrações &gt; Webhooks &gt; Cobranças.</small>
+                  </div>
+
+                  <div class="form-group" style="margin-bottom:20px;">
+                    <label for="asaasConfigWebhookToken" style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Token de Validação do Webhook (Opcional)</label>
+                    <input type="text" id="asaasConfigWebhookToken" class="form-control" placeholder="token-secreto-de-validacao" style="width:100%; min-height:42px; border-radius:10px; border:1px solid #cbd5e1; padding:0 12px; font-family:monospace; font-size:13px;" />
+                  </div>
+
+                  <button type="submit" id="asaasBtnSaveConfig" class="btn btn-accent" style="min-height:44px; border-radius:12px; font-weight:700; padding:0 24px;">
+                    Salvar Configurações do Asaas
+                  </button>
+                </form>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Botão Flutuante Mobile Copiloto -->
+    <button id="copilotFab" class="copilot-fab" title="Abrir Copiloto" aria-label="Abrir Copiloto House 190">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+      </svg>
+    </button>
+
+    <!-- Gaveta do Copiloto House 190 -->
+    <div id="copilotDrawer" class="copilot-drawer hidden" aria-hidden="true" role="dialog" aria-labelledby="copilotTitle">
+      <div class="copilot-backdrop" id="copilotBackdrop"></div>
+      <aside class="copilot-panel">
+        <div class="copilot-drag-handle" aria-hidden="true"></div>
+        <header class="copilot-header">
+          <div class="copilot-header-info">
+            <div class="copilot-avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+              </svg>
+            </div>
+            <div class="copilot-title-group">
+              <h2 id="copilotTitle" class="copilot-title">Copiloto House 190</h2>
+              <span class="copilot-badge"><span class="copilot-badge-dot"></span><span id="copilotRoleBadge">Operação Ativa</span></span>
+            </div>
+          </div>
+          <div class="copilot-header-actions">
+            <button type="button" id="copilotClearChatBtn" class="copilot-header-btn" title="Limpar conversa" aria-label="Limpar conversa">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+            <button type="button" id="copilotSettingsBtn" class="copilot-header-btn" title="Configurações da IA" aria-label="Configurar IA">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+            <button type="button" id="copilotCloseBtn" class="copilot-close-btn" aria-label="Fechar Copiloto">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div id="copilotSettingsPanel" class="copilot-settings-panel hidden">
+          <div class="copilot-settings-header">
+            <strong>Configurações da IA (Gemini)</strong>
+            <span id="copilotEngineStatus" class="copilot-engine-status">Motor Local</span>
+          </div>
+          <p class="copilot-settings-desc">Escolha o modelo de IA e insira sua chave do Google AI Studio. Se deixado em branco, o motor autônomo offline opera com latência zero.</p>
+          <div class="copilot-settings-field">
+            <label for="copilotModelSelect" class="copilot-settings-label">Modelo de IA:</label>
+            <select id="copilotModelSelect" class="copilot-settings-select">
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado - Ultrarrápido)</option>
+              <option value="gemini-4-argon">Gemini 4 Argon (Raciocínio Avançado)</option>
+            </select>
+          </div>
+          <div class="copilot-settings-input-group">
+            <input type="password" id="copilotApiKeyInput" class="copilot-settings-input" placeholder="Cole sua chave de API do Gemini..." autocomplete="off">
+            <button type="button" id="copilotSaveKeyBtn" class="copilot-settings-save-btn">Salvar</button>
+            <button type="button" id="copilotClearKeyBtn" class="copilot-settings-clear-btn" title="Remover chave">Limpar</button>
+          </div>
+          <small class="copilot-settings-help">Obtenha sua chave gratuita em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</small>
+        </div>
+
+        <div class="copilot-body" id="copilotBody">
+          <div class="copilot-messages" id="copilotMessages"></div>
+        </div>
+
+        <footer class="copilot-footer">
+          <div class="copilot-screen-indicator" id="copilotScreenIndicator">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            <span id="copilotScreenName">Painel Geral</span>
+          </div>
+          <div class="copilot-quick-suggestions" id="copilotQuickSuggestions"></div>
+          <form id="copilotForm" class="copilot-input-form">
+            <textarea id="copilotInput" class="copilot-input" placeholder="Comande uma ação ou tire dúvidas..." rows="1"></textarea>
+            <button type="submit" id="copilotSendBtn" class="copilot-send-btn" aria-label="Enviar comando">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </form>
+        </footer>
+      </aside>
+    </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+    <?!= include_('Dialogs'); ?>
+    <?!= include_('Scripts'); ?>
+  </body>
+</html>

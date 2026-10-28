@@ -1,0 +1,44 @@
+{
+  "id": "./",
+  "name": "PontoFlow Pro — Sistema Inteligente de Ponto e Escalas",
+  "short_name": "PontoFlow",
+  "description": "Ponto eletrônico inteligente, escalas, folgas e RH digital da sua equipe.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./?source=pwa&v=6.16.45",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6F7F9",
+  "theme_color": "#1B365D",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./apple-touch-icon-6.1.5.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/app-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+node_modules/
+node_modules
+dist/
+dist
+.firebase/
+firebase-debug.log
+database-debug.log
+ui-debug.log
+.DS_Store
+*.local
+test-screenshot.png
+/tmp/
+
+.wrangler/
+.dev.vars
+worker-configuration.d.ts

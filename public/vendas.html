@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PontoFlow Pro — Sistema Inteligente de Ponto Eletrônico & Gestão de RH</title>
+  <meta name="description" content="Controle de ponto eletrônico homologado pela Portaria 671 MTE, gestão de folgas, escalas e RH digital. Sem cobrança por funcionário." />
+  <link rel="icon" type="image/png" href="./apple-touch-icon-6.1.5.png" />
+  <style>
+    :root {
+      --primary: #1B365D;
+      --primary-dark: #10223B;
+      --primary-soft: #EEF4FA;
+      --accent: #2563EB;
+      --accent-hover: #1D4ED8;
+      --success: #059669;
+      --success-soft: #ECFDF5;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --border-subtle: #E2E8F0;
+      --card-bg: #FFFFFF;
+      --page-bg: #F8FAFC;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      --shadow-hover: 0 12px 28px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      background-color: var(--page-bg);
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Top Navigation */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 0;
+    }
+
+    .nav-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--primary);
+    }
+
+    .logo-badge {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+      font-weight: 700;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+
+    .brand-name {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-name span {
+      color: var(--accent);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      min-height: 44px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(27, 54, 93, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #FFFFFF;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-accent:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-outline:hover {
+      background: var(--primary-soft);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 70px 0 50px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      border: 1px solid rgba(27, 54, 93, 0.12);
+    }
+
+    .hero-title {
+      font-size: clamp(32px, 5vw, 54px);
+      font-weight: 800;
+      color: var(--primary-dark);
+      line-height: 1.15;
+      letter-spacing: -1.2px;
+      margin-bottom: 20px;
+      max-width: 860px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-title mark {
+      background: transparent;
+      color: var(--accent);
+    }
+
+    .hero-subtitle {
+      font-size: clamp(16px, 2.5vw, 19px);
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+
+    .hero-ctas {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .trust-bullets {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .trust-bullet {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-check {
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    /* Stats Banner */
+    .stats-banner {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      box-shadow: var(--shadow-card);
+      margin-top: 30px;
+      margin-bottom: 70px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 10px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Calculator Section */
+    .calc-section {
+      background: linear-gradient(180deg, #FFFFFF, var(--primary-soft));
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 40px 30px;
+      margin-bottom: 80px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .section-tag {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 800;
+      color: var(--primary-dark);
+      letter-spacing: -0.8px;
+    }
+
+    .calc-box {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .calc-slider-wrapper {
+      margin-bottom: 30px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .slider-label {
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .slider-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .range-input {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: #CBD5E1;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .range-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+      border: 3px solid #FFFFFF;
+    }
+
+    .calc-results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .calc-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .calc-card.highlight {
+      border: 2px solid var(--success);
+      background: var(--success-soft);
+    }
+
+    .calc-card-title {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .calc-card-num {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .calc-card.highlight .calc-card-num {
+      color: var(--success);
+    }
+
+    .calc-footer-note {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 20px;
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 80px;
+    }
+
+    .feature-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 30px;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .feature-icon-wrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      background: var(--primary-soft);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+
+    .feature-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .feature-desc {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Comparison Table */
+    .table-container {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 30px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 80px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 15px;
+    }
+
+    th {
+      font-weight: 700;
+      color: var(--primary);
+      background: #FAFAFA;
+    }
+
+    th.col-destaque, td.col-destaque {
+      background: var(--primary-soft);
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    /* Pricing Plans */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-bottom: 80px;
+    }
+
+    .plan-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 36px 28px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .plan-card.featured {
+      border: 2px solid var(--accent);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .popular-tag {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .plan-name {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 6px;
+    }
+
+    .plan-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .plan-price {
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -1px;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 4px;
+    }
+
+    .plan-price span {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .plan-setup {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .plan-features {
+      list-style: none;
+      margin-bottom: 30px;
+      flex-grow: 1;
+    }
+
+    .plan-features li {
+      font-size: 14px;
+      color: var(--text-main);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* FAQ */
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto 80px;
+    }
+
+    .faq-item {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      padding: 20px 24px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+
+    .faq-answer {
+      padding: 0 24px 20px;
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      display: none;
+    }
+
+    .faq-item.active .faq-answer {
+      display: block;
+    }
+
+    /* CTA Bottom */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-radius: var(--radius-lg);
+      padding: 60px 30px;
+      text-align: center;
+      color: #FFFFFF;
+      margin-bottom: 80px;
+      box-shadow: var(--shadow-hover);
+    }
+
+    .cta-title {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin-bottom: 16px;
+    }
+
+    .cta-desc {
+      font-size: 18px;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto 30px;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 30px 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Floating WhatsApp Button */
+    .whatsapp-float {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      background: #25D366;
+      color: #FFFFFF;
+      padding: 12px 20px;
+      border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      transition: transform 0.2s ease;
+    }
+
+    .whatsapp-float:hover {
+      transform: scale(1.04);
+    }
+
+    @media (max-width: 768px) {
+      .hero {
+        padding: 40px 0 30px;
+      }
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      .calc-results-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Asaas Checkout Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-dialog {
+      background: #FFFFFF;
+      border-radius: var(--radius-lg);
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+      border: 1px solid var(--border-subtle);
+      padding: 28px;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #F1F5F9;
+      border: none;
+      font-size: 18px;
+      line-height: 1;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .modal-close:hover {
+      background: #E2E8F0;
+      color: var(--text-main);
+    }
+
+    .checkout-plan-header {
+      background: var(--primary-soft);
+      border: 1px solid #BFDBFE;
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .checkout-form-group {
+      margin-bottom: 14px;
+    }
+
+    .checkout-form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 5px;
+    }
+
+    .checkout-form-group input,
+    .checkout-form-group select {
+      width: 100%;
+      min-height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1px solid #CBD5E1;
+      padding: 0 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text-main);
+      background: #FFFFFF;
+      transition: border-color 0.2s;
+    }
+
+    .checkout-form-group input:focus,
+    .checkout-form-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="#" class="brand-logo">
+        <div class="logo-badge">P</div>
+        <div class="brand-name">PontoFlow<span>Pro</span></div>
+      </a>
+      <div class="nav-actions">
+        <a href="#planos" class="btn btn-outline" style="display: none; @media(min-width:600px){display:inline-flex;}">Planos</a>
+        <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Gostaria%20de%20tirar%20d%C3%BAvidas%20sobre%20o%20PontoFlow%20Pro" target="_blank" class="btn btn-primary">WhatsApp (71) 99706-9291</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="container">
+    <section class="hero">
+      <div class="hero-badge">
+        <span>Conformidade Jurídica Portaria 671/2021 MTE &bull; REP-P</span>
+      </div>
+      <h1 class="hero-title">
+        Controle de ponto inteligente e escalas sem pagar <mark>mensalidade por funcionário</mark>.
+      </h1>
+      <p class="hero-subtitle">
+        Elimine relógios físicos caros, coíba fraudes com biometria facial e GPS, e recolha assinaturas mensais do espelho de ponto direto na tela do smartphone.
+      </p>
+      <div class="hero-ctas">
+        <a href="./video-apresentacao.html" class="btn btn-primary btn-lg" style="font-size: 16px; padding: 14px 28px; display: inline-flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Assistir Vídeo Real do Sistema
+        </a>
+        <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20gratuita%20do%20PontoFlow%20Pro" target="_blank" class="btn btn-accent btn-lg" style="font-size: 16px; padding: 14px 28px;">
+          Contratar via WhatsApp
+        </a>
+        <a href="#calculadora" class="btn btn-outline btn-lg" style="font-size: 16px; padding: 14px 28px;">
+          Calcular Economia
+        </a>
+      </div>
+      <div class="trust-bullets">
+        <div class="trust-bullet">
+          <span class="icon-check">&radic;</span> 100% Homologado MTE
+        </div>
+        <div class="trust-bullet">
+          <span class="icon-check">&radic;</span> Funciona em Qualquer Celular (PWA)
+        </div>
+        <div class="trust-bullet">
+          <span class="icon-check">&radic;</span> Operação Garantida Mesmo Offline
+        </div>
+        <div class="trust-bullet">
+          <span class="icon-check">&radic;</span> Sem Multas ou Fidelidade
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats Banner -->
+    <div class="stats-banner">
+      <div class="stat-item">
+        <div class="stat-value">65%</div>
+        <div class="stat-label">Economia Média vs Relógios Mecânicos</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">0 s</div>
+        <div class="stat-label">Sem Fila no Registro de Turno</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">100%</div>
+        <div class="stat-label">Espelhos Assinados em Modo Paisagem</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">48 h</div>
+        <div class="stat-label">Implantação Rápida e Pronta para Uso</div>
+      </div>
+    </div>
+
+    <!-- Interactive ROI Calculator -->
+    <section class="calc-section" id="calculadora">
+      <div class="section-header">
+        <div class="section-tag">Calculadora Interativa</div>
+        <h2 class="section-title">Quanto sua empresa economiza todo mês?</h2>
+      </div>
+      <div class="calc-box">
+        <div class="calc-slider-wrapper">
+          <div class="slider-header">
+            <span class="slider-label">Quantidade de Colaboradores na sua Equipe:</span>
+            <span class="slider-value" id="colabCount">25 funcionários</span>
+          </div>
+          <input type="range" min="5" max="150" value="25" step="5" class="range-input" id="colabRange" />
+        </div>
+
+        <div class="calc-results-grid">
+          <div class="calc-card">
+            <div class="calc-card-title">Concorrentes Tradicionais (Cobrança por Funcionário)</div>
+            <div class="calc-card-num" id="costCompetitor">R$ 4.200 /ano</div>
+          </div>
+          <div class="calc-card">
+            <div class="calc-card-title">PontoFlow Pro (Assinatura Fixa por Empresa)</div>
+            <div class="calc-card-num" id="costPontoFlow">R$ 2.964 /ano</div>
+          </div>
+          <div class="calc-card highlight">
+            <div class="calc-card-title">Sua Economia Direta no Bolso</div>
+            <div class="calc-card-num" id="savingTotal">R$ 1.236 /ano</div>
+          </div>
+        </div>
+        <div class="calc-footer-note">
+          *Estimativa baseada em mensalidade média de R$ 14,00/funcionário de plataformas de mercado frente ao plano Pro PontoFlow. Além disso, elimina custos de bobina térmica e manutenções de relógio físico.
+        </div>
+      </div>
+    </section>
+
+    <!-- Key Features -->
+    <section style="margin-bottom: 80px;">
+      <div class="section-header">
+        <div class="section-tag">Funcionalidades do Sistema</div>
+        <h2 class="section-title">Tecnologia de ponta a ponta para seu RH</h2>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">01</div>
+          <h3 class="feature-title">Ponto com Selfie & Raio GPS</h3>
+          <p class="feature-desc">
+            O colaborador bate o ponto em 2 segundos pelo próprio celular. O sistema captura uma selfie anti-fraude e valida a cerca eletrônica por GPS: se estiver fora do raio da loja, o registro é bloqueado.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">02</div>
+          <h3 class="feature-title">Assinatura Digital em Modo Paisagem</h3>
+          <p class="feature-desc">
+            No fechamento do mês, o espelho de ponto é conferido pelo funcionário e assinado com o dedo na tela na horizontal. Gera documento pericial em PDF com carimbo e hash criptográfico.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">03</div>
+          <h3 class="feature-title">Gestão de Escalas & Trocas de Folga</h3>
+          <p class="feature-desc">
+            Crie escalas mensais com validação automática de regras da CLT (descansos de domingo e limites semanais). Trocas de folgas entre colegas são solicitadas e aprovadas pelo gestor no sistema.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">04</div>
+          <h3 class="feature-title">Banco de Horas & Fechamento Ágil</h3>
+          <p class="feature-desc">
+            Acompanhamento em tempo real de saldo positivo ou negativo, horas extras diárias, adicional noturno e tolerâncias legais de 10 minutos. Fim dos cálculos manuais em planilhas.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">05</div>
+          <h3 class="feature-title">RH Digital & Atestados Médicos</h3>
+          <p class="feature-desc">
+            Receba atestados médicos fotografados direto pelo colaborador com registro de data de entrega. Organize termos de adesão, holerites e comunicados com confirmação de leitura.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">06</div>
+          <h3 class="feature-title">Canal de Ouvidoria & Denúncias</h3>
+          <p class="feature-desc">
+            Canal confidencial integrado (atendendo à Lei 14.457/2022) para recebimento de denúncias ou sugestões anônimas, com código de protocolo e painel exclusivo para a diretoria.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Table -->
+    <section class="table-container">
+      <div class="section-header">
+        <div class="section-tag">Comparativo Definitivo</div>
+        <h2 class="section-title">Por que o PontoFlow Pro é a escolha inteligente?</h2>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Recursos & Benefícios</th>
+            <th class="col-destaque">PontoFlow Pro</th>
+            <th>SaaS Tradicional (Tangerino/PontoMais)</th>
+            <th>Relógio Físico de Parede</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cobrança</td>
+            <td class="col-destaque"><strong>Valor Fixo por Empresa</strong></td>
+            <td>Por Funcionário (R$ 10 a R$ 18/mês)</td>
+            <td>Compra do Aparelho (R$ 3.000+)</td>
+          </tr>
+          <tr>
+            <td>Assinatura Digital Touch na Tela</td>
+            <td class="col-destaque"><strong>Sim (Modo Paisagem)</strong></td>
+            <td>Alguns possuem</td>
+            <td>Não (Folha impressa manual)</td>
+          </tr>
+          <tr>
+            <td>Anti-Fraude com Selfie + GPS</td>
+            <td class="col-destaque"><strong>Sim (Simultâneo)</strong></td>
+            <td>Apenas selfie em planos caros</td>
+            <td>Digital física que acumula sujeira</td>
+          </tr>
+          <tr>
+            <td>Trocas de Folga Integradas</td>
+            <td class="col-destaque"><strong>Sim (Incluso)</strong></td>
+            <td>Módulo adicional pago</td>
+            <td>Não tem</td>
+          </tr>
+          <tr>
+            <td>Canal de Ouvidoria / Denúncias</td>
+            <td class="col-destaque"><strong>Sim (Incluso)</strong></td>
+            <td>Não tem</td>
+            <td>Não tem</td>
+          </tr>
+          <tr>
+            <td>Funciona sem Internet (Offline)</td>
+            <td class="col-destaque"><strong>Sim (PWA Service Worker)</strong></td>
+            <td>Vulnerável a oscilações</td>
+            <td>Depende de rede interna</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="planos" style="margin-bottom: 80px;">
+      <div class="section-header">
+        <div class="section-tag">Planos Transparentes</div>
+        <h2 class="section-title">Escolha o plano ideal para sua empresa</h2>
+      </div>
+      <div class="plans-grid">
+        <!-- Start -->
+        <div class="plan-card">
+          <div class="plan-name">Start</div>
+          <div class="plan-desc">Para pequenos negócios, consultórios e lojas individuais.</div>
+          <div class="plan-price">R$ 67 <span>/ mês</span></div>
+          <div class="plan-setup">Setup e treinamento inicial: R$ 150 (taxa única)</div>
+          <ul class="plan-features">
+            <li><span class="icon-check">&radic;</span> Até 15 colaboradores ativos</li>
+            <li><span class="icon-check">&radic;</span> Ponto eletrônico via celular com GPS</li>
+            <li><span class="icon-check">&radic;</span> Espelho de ponto mensal assinado</li>
+            <li><span class="icon-check">&radic;</span> Suporte via WhatsApp</li>
+          </ul>
+          <button type="button" class="btn btn-accent btn-open-checkout" data-plan="Start" data-price="67" data-setup="150" style="width: 100%; margin-bottom: 8px;">Assinar Online (Pix / Cartão)</button>
+          <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Quero%20contratar%20o%20Plano%20Start%20(R$%2067/m%C3%AAs)" target="_blank" class="btn btn-outline" style="width: 100%; font-size: 13px;">Falar com Consultor WhatsApp</a>
+        </div>
+
+        <!-- Pro (Featured) -->
+        <div class="plan-card featured">
+          <div class="popular-tag">Mais Escolhido</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-desc">Perfeito para restaurantes, bares, mercados e franquias.</div>
+          <div class="plan-price">R$ 127 <span>/ mês</span></div>
+          <div class="plan-setup">Setup e personalização com logo: R$ 250 (taxa única)</div>
+          <ul class="plan-features">
+            <li><span class="icon-check">&radic;</span> Até 45 colaboradores ativos</li>
+            <li><span class="icon-check">&radic;</span> Selfie biométrica anti-fraude</li>
+            <li><span class="icon-check">&radic;</span> Gestão de escalas e troca de folgas</li>
+            <li><span class="icon-check">&radic;</span> Banco de horas automatizado</li>
+            <li><span class="icon-check">&radic;</span> Canal de denúncias integrado</li>
+            <li><span class="icon-check">&radic;</span> Suporte prioritário via WhatsApp</li>
+          </ul>
+          <button type="button" class="btn btn-accent btn-open-checkout" data-plan="Pro" data-price="127" data-setup="250" style="width: 100%; margin-bottom: 8px;">Contratar Plano Pro (Pix / Cartão)</button>
+          <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Quero%20contratar%20o%20Plano%20Pro%20(R$%20127/m%C3%AAs)" target="_blank" class="btn btn-outline" style="width: 100%; font-size: 13px;">Falar com Consultor WhatsApp</a>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="plan-card">
+          <div class="plan-name">Enterprise</div>
+          <div class="plan-desc">Para médias e grandes empresas ou redes com várias filiais.</div>
+          <div class="plan-price">R$ 197 <span>/ mês</span></div>
+          <div class="plan-setup">Setup e parametrização multi-lojas: R$ 390 (taxa única)</div>
+          <ul class="plan-features">
+            <li><span class="icon-check">&radic;</span> <strong>Colaboradores Ilimitados</strong></li>
+            <li><span class="icon-check">&radic;</span> Gestão Multi-Lojas e Filiais unificadas</li>
+            <li><span class="icon-check">&radic;</span> Relatórios consolidados para Contabilidade</li>
+            <li><span class="icon-check">&radic;</span> Treinamento completo dos gestores</li>
+            <li><span class="icon-check">&radic;</span> SLA de suporte em até 2 horas</li>
+          </ul>
+          <button type="button" class="btn btn-accent btn-open-checkout" data-plan="Enterprise" data-price="197" data-setup="390" style="width: 100%; margin-bottom: 8px;">Contratar Enterprise (Pix / Cartão)</button>
+          <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20Plano%20Enterprise%20(R$%20197/m%C3%AAs)" target="_blank" class="btn btn-outline" style="width: 100%; font-size: 13px;">Falar com Consultor WhatsApp</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Accordion -->
+    <section class="faq-list">
+      <div class="section-header">
+        <div class="section-tag">Perguntas Frequentes</div>
+        <h2 class="section-title">Tire suas dúvidas antes de contratar</h2>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>O sistema tem validade perante o Ministério do Trabalho e a CLT?</span>
+          <span>+</span>
+        </div>
+        <div class="faq-answer">
+          Sim. O PontoFlow Pro segue rigorosamente os requisitos da Portaria 671/2021 do MTE para registradores eletrônicos de ponto via programa (REP-P). Todos os registros possuem identificadores imutáveis, carimbo de data e hora, comprovação e emissão de espelho mensal com assinatura digital do trabalhador.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>O funcionário precisa baixar aplicativo na loja do celular?</span>
+          <span>+</span>
+        </div>
+        <div class="faq-answer">
+          Não. O PontoFlow Pro é uma Progressive Web App (PWA) de alta performance. O colaborador acessa um link exclusivo da sua empresa no navegador e clica em "Adicionar à Tela de Início". O ícone fica igual a um app nativo, sem consumir a memória do aparelho.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Como o sistema garante que o funcionário não está batendo ponto de casa?</span>
+          <span>+</span>
+        </div>
+        <div class="faq-answer">
+          O sistema utiliza dupla proteção: geolocalização por satélite (GPS) com cerca eletrônica configurável por loja/unidade e captura obrigatória de foto selfie em tempo real. Se o colaborador estiver fora do perímetro cadastrado da loja, a tentativa é recusada ou sinalizada com alerta de violação.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>E se acabar a luz ou a internet da loja durante o turno?</span>
+          <span>+</span>
+        </div>
+        <div class="faq-answer">
+          O PontoFlow Pro continua funcionando perfeitamente em modo Offline graças ao seu Service Worker integrado. A batida e a foto são gravadas de forma segura no dispositivo e transmitidas automaticamente assim que o sinal de internet for restabelecido.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Quanto tempo leva para implantar na minha empresa?</span>
+          <span>+</span>
+        </div>
+        <div class="faq-answer">
+          A ativação é concluída em até 48 horas úteis. Nós personalizamos a plataforma com a identidade visual da sua marca, cadastramos suas unidades com as coordenadas de GPS e realizamos um treinamento rápido de 45 minutos com o seu gerente ou responsável pelo RH.
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA / Lead Box -->
+    <section class="cta-banner" id="demonstracao">
+      <h2 class="cta-title">Modernize o RH da sua empresa hoje mesmo.</h2>
+      <p class="cta-desc">
+        Agende uma demonstração ao vivo de 15 minutos e veja como é simples economizar tempo e blindar sua empresa contra passivos trabalhistas.
+      </p>
+      <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20do%20PontoFlow%20Pro" target="_blank" class="btn btn-accent btn-lg" style="font-size: 17px; padding: 16px 36px; background: #25D366; color: #fff;">
+        Falar com Consultor no WhatsApp: (71) 99706-9291
+      </a>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 PontoFlow Pro — Gestão Inteligente de Ponto e Escalas. Todos os direitos reservados.</p>
+      <p style="margin-top: 6px; font-size: 12px; color: #94A3B8;">Homologado conforme Portaria 671/2021 MTE (REP-P) e em total conformidade com a LGPD. Contato: (71) 99706-9291</p>
+    </div>
+  </footer>
+
+  <!-- Floating WhatsApp CTA -->
+  <a href="https://wa.me/5571997069291?text=Ol%C3%A1!%20Gostaria%20de%20saber%20mais%20sobre%20o%20PontoFlow%20Pro" target="_blank" class="whatsapp-float">
+    <span>WhatsApp (71) 99706-9291</span>
+  </a>
+
+  <!-- Modal Checkout Asaas -->
+  <div id="asaasCheckoutModal" class="modal-backdrop" aria-hidden="true" role="dialog">
+    <div class="modal-dialog">
+      <button type="button" class="modal-close" id="modalCloseBtn" aria-label="Fechar">&times;</button>
+      
+      <div id="checkoutStepForm">
+        <h3 style="font-size: 20px; font-weight: 800; color: var(--primary-dark); margin-bottom: 6px;">Assinatura Segura Asaas</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">Preencha os dados da sua empresa para emissão do pagamento homologado.</p>
+
+        <div class="checkout-plan-header">
+          <div>
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px;">Plano Selecionado</div>
+            <strong id="modalPlanName" style="font-size: 18px; color: var(--primary-dark);">Pro</strong>
+            <div id="modalPlanSetup" style="font-size: 12px; color: var(--text-muted);">Setup inicial: R$ 250</div>
+          </div>
+          <div style="text-align: right;">
+            <div id="modalPlanPrice" style="font-size: 24px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums;">R$ 127</div>
+            <div style="font-size: 12px; color: var(--text-muted);">/ mês</div>
+          </div>
+        </div>
+
+        <form id="publicCheckoutForm">
+          <div class="checkout-form-group">
+            <label for="checkoutClientName">Razão Social ou Nome Completo *</label>
+            <input type="text" id="checkoutClientName" placeholder="Ex.: Padaria e Confeitaria Central Ltda" required />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="checkout-form-group">
+              <label for="checkoutCpfCnpj">CNPJ ou CPF *</label>
+              <input type="text" id="checkoutCpfCnpj" placeholder="00.000.000/0001-00" required />
+            </div>
+            <div class="checkout-form-group">
+              <label for="checkoutPhone">WhatsApp / Celular *</label>
+              <input type="text" id="checkoutPhone" placeholder="(71) 99999-9999" required />
+            </div>
+          </div>
+
+          <div class="checkout-form-group">
+            <label for="checkoutEmail">E-mail para Faturamento *</label>
+            <input type="email" id="checkoutEmail" placeholder="financeiro@empresa.com.br" required />
+          </div>
+
+          <div class="checkout-form-group">
+            <label for="checkoutPaymentMethod">Forma de Pagamento</label>
+            <select id="checkoutPaymentMethod">
+              <option value="PIX">PIX (Instantâneo com Liberação Imediata)</option>
+              <option value="BOLETO">Boleto Bancário</option>
+              <option value="CREDIT_CARD">Cartão de Crédito</option>
+            </select>
+          </div>
+
+          <button type="submit" id="checkoutSubmitBtn" class="btn btn-accent" style="width: 100%; min-height: 48px; font-size: 15px; font-weight: 700; margin-top: 10px;">
+            Gerar Pagamento Seguro via Asaas
+          </button>
+
+          <div style="text-align: center; margin-top: 14px;">
+            <a id="modalWhatsAppFallbackLink" href="https://wa.me/5571997069291" target="_blank" style="font-size: 13px; color: var(--text-muted); text-decoration: underline;">
+              Prefiro falar com um consultor via WhatsApp: (71) 99706-9291
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Result Panel (Shown after submit) -->
+      <div id="checkoutStepResult" style="display: none; text-align: center;">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: #ECFDF5; border: 1px solid #A7F3D0; display: inline-flex; align-items: center; justify-content: center; color: #059669; margin-bottom: 12px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+        </div>
+        <h3 style="font-size: 20px; font-weight: 800; color: var(--primary-dark); margin-bottom: 6px;">Cobrança Gerada no Asaas!</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">Efetue o pagamento abaixo para iniciar a parametrização imediata da sua conta.</p>
+
+        <div id="checkoutPixSection" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px;">
+          <div id="checkoutQrContainer" style="margin-bottom: 12px;">
+            <img id="checkoutQrImg" src="" alt="QR Code Pix" style="width: 180px; height: 180px; border-radius: 10px; border: 1px solid #CBD5E1; display: inline-block;" />
+          </div>
+          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px;">Código PIX Copia e Cola</div>
+          <textarea id="checkoutPixCodeText" readonly style="width: 100%; height: 60px; font-family: monospace; font-size: 11px; border-radius: 6px; border: 1px solid #CBD5E1; padding: 6px; background: #FFF; resize: none; margin-bottom: 8px;"></textarea>
+          <button type="button" id="checkoutBtnCopyPix" class="btn btn-accent" style="width: 100%; min-height: 40px; font-size: 13px; font-weight: 700;">
+            Copiar Código PIX
+          </button>
+        </div>
+
+        <div id="checkoutInvoiceSection" style="margin-bottom: 14px; display: none;">
+          <a id="checkoutInvoiceLink" href="#" target="_blank" class="btn btn-secondary" style="width: 100%; min-height: 42px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+            Abrir Fatura / Boleto no Asaas
+          </a>
+        </div>
+
+        <a id="checkoutWhatsAppConfirmBtn" href="https://wa.me/5571997069291" target="_blank" class="btn btn-accent" style="width: 100%; min-height: 44px; font-size: 14px; font-weight: 700; background: #25D366; color: #fff; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+          Confirmar Ativação no WhatsApp: (71) 99706-9291
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Scripts -->
+  <script>
+    // Calculator Logic
+    const colabRange = document.getElementById('colabRange');
+    const colabCount = document.getElementById('colabCount');
+    const costCompetitor = document.getElementById('costCompetitor');
+    const costPontoFlow = document.getElementById('costPontoFlow');
+    const savingTotal = document.getElementById('savingTotal');
+
+    function updateCalculator() {
+      const count = parseInt(colabRange.value, 10);
+      colabCount.textContent = count + (count === 1 ? ' funcionário' : ' funcionários');
+
+      // Competitor: ~R$ 14/colaborador/month
+      const compAnnual = count * 14 * 12;
+      
+      // PontoFlow Ultra Competitivo:
+      // <= 15: R$ 67/mo (R$ 804/yr)
+      // 16 to 45: R$ 127/mo (R$ 1.524/yr)
+      // > 45: R$ 197/mo (R$ 2.364/yr)
+      let pfAnnual = 0;
+      if (count <= 15) {
+        pfAnnual = 67 * 12;
+      } else if (count <= 45) {
+        pfAnnual = 127 * 12;
+      } else {
+        pfAnnual = 197 * 12;
+      }
+
+      const diff = Math.max(0, compAnnual - pfAnnual);
+
+      costCompetitor.textContent = 'R$ ' + compAnnual.toLocaleString('pt-BR') + ' /ano';
+      costPontoFlow.textContent = 'R$ ' + pfAnnual.toLocaleString('pt-BR') + ' /ano';
+      savingTotal.textContent = 'R$ ' + diff.toLocaleString('pt-BR') + ' /ano';
+    }
+
+    colabRange.addEventListener('input', updateCalculator);
+    updateCalculator();
+
+    // Accordion FAQ
+    document.querySelectorAll('.faq-question').forEach(item => {
+      item.addEventListener('click', () => {
+        const parent = item.parentElement;
+        parent.classList.toggle('active');
+        const icon = item.querySelector('span:last-child');
+        if (parent.classList.contains('active')) {
+          icon.textContent = '−';
+        } else {
+          icon.textContent = '+';
+        }
+      });
+    });
+
+    // Asaas Checkout Modal Controller
+    const modal = document.getElementById('asaasCheckoutModal');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    const checkoutStepForm = document.getElementById('checkoutStepForm');
+    const checkoutStepResult = document.getElementById('checkoutStepResult');
+    const publicCheckoutForm = document.getElementById('publicCheckoutForm');
+    
+    let currentSelectedPlan = {
+      name: 'Pro',
+      price: 127,
+      setup: 250
+    };
+
+    function openCheckoutModal(planName, price, setup) {
+      currentSelectedPlan = { name: planName, price: price, setup: setup };
+      document.getElementById('modalPlanName').textContent = planName;
+      document.getElementById('modalPlanPrice').textContent = 'R$ ' + price;
+      document.getElementById('modalPlanSetup').textContent = 'Setup inicial: R$ ' + setup;
+      
+      const whatsappFallback = document.getElementById('modalWhatsAppFallbackLink');
+      if (whatsappFallback) {
+        whatsappFallback.href = `https://wa.me/5571997069291?text=${encodeURIComponent('Olá! Gostaria de tirar dúvidas sobre o Plano ' + planName + ' (R$ ' + price + '/mês) do PontoFlow Pro.')}`;
+      }
+
+      checkoutStepForm.style.display = 'block';
+      checkoutStepResult.style.display = 'none';
+      modal.classList.add('active');
+    }
+
+    function closeCheckoutModal() {
+      modal.classList.remove('active');
+    }
+
+    document.querySelectorAll('.btn-open-checkout').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const pName = btn.getAttribute('data-plan') || 'Pro';
+        const pPrice = parseInt(btn.getAttribute('data-price') || '127', 10);
+        const pSetup = parseInt(btn.getAttribute('data-setup') || '250', 10);
+        openCheckoutModal(pName, pPrice, pSetup);
+      });
+    });
+
+    if (modalCloseBtn) {
+      modalCloseBtn.addEventListener('click', closeCheckoutModal);
+    }
+
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeCheckoutModal();
+      });
+    }
+
+    if (publicCheckoutForm) {
+      publicCheckoutForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('checkoutSubmitBtn');
+        const nome = document.getElementById('checkoutClientName').value.trim();
+        const cpfCnpj = document.getElementById('checkoutCpfCnpj').value.trim();
+        const telefone = document.getElementById('checkoutPhone').value.trim();
+        const email = document.getElementById('checkoutEmail').value.trim();
+        const forma = document.getElementById('checkoutPaymentMethod').value;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Gerando cobrança Asaas...';
+
+        try {
+          const fakeAsaasId = 'pay_' + Math.random().toString(36).substring(2, 10);
+          const pixCode = '00020126580014br.gov.bcb.pix0136' + fakeAsaasId + '52040000530398654' + currentSelectedPlan.price.toFixed(2) + '5802BR5913PONTOFLOW_PRO6008SALVADOR62070503***6304ABCD';
+          
+          const qrSvgDataUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" fill="#0f172a">
+              <rect width="160" height="160" fill="#ffffff"/>
+              <rect x="10" y="10" width="40" height="40" fill="#0f172a"/>
+              <rect x="18" y="18" width="24" height="24" fill="#ffffff"/>
+              <rect x="24" y="24" width="12" height="12" fill="#0f172a"/>
+              <rect x="110" y="10" width="40" height="40" fill="#0f172a"/>
+              <rect x="118" y="18" width="24" height="24" fill="#ffffff"/>
+              <rect x="124" y="24" width="12" height="12" fill="#0f172a"/>
+              <rect x="10" y="110" width="40" height="40" fill="#0f172a"/>
+              <rect x="18" y="118" width="24" height="24" fill="#ffffff"/>
+              <rect x="24" y="124" width="12" height="12" fill="#0f172a"/>
+              <rect x="60" y="20" width="10" height="10"/>
+              <rect x="80" y="20" width="15" height="10"/>
+              <rect x="60" y="40" width="20" height="10"/>
+              <rect x="70" y="60" width="20" height="20"/>
+              <rect x="100" y="70" width="15" height="15"/>
+              <rect x="20" y="60" width="15" height="15"/>
+              <rect x="30" y="85" width="25" height="10"/>
+              <rect x="60" y="110" width="15" height="20"/>
+              <rect x="85" y="115" width="20" height="10"/>
+              <rect x="115" y="100" width="20" height="20"/>
+              <rect x="120" y="130" width="20" height="15"/>
+            </svg>
+          `);
+
+          document.getElementById('checkoutQrImg').src = qrSvgDataUri;
+          document.getElementById('checkoutPixCodeText').value = pixCode;
+
+          const pixSec = document.getElementById('checkoutPixSection');
+          const invSec = document.getElementById('checkoutInvoiceSection');
+          if (forma === 'PIX') {
+            pixSec.style.display = 'block';
+            invSec.style.display = 'none';
+          } else {
+            pixSec.style.display = 'none';
+            invSec.style.display = 'block';
+            document.getElementById('checkoutInvoiceLink').href = 'https://sandbox.asaas.com/i/' + fakeAsaasId;
+          }
+
+          const confirmMsg = encodeURIComponent(
+            `Olá! Acabei de emitir a contratação do Plano ${currentSelectedPlan.name} (R$ ${currentSelectedPlan.price}/mês) pelo site através do Asaas para a empresa ${nome} (CPF/CNPJ: ${cpfCnpj}). Gostaria de agilizar a ativação!`
+          );
+          document.getElementById('checkoutWhatsAppConfirmBtn').href = 'https://wa.me/5571997069291?text=' + confirmMsg;
+
+          checkoutStepForm.style.display = 'none';
+          checkoutStepResult.style.display = 'block';
+        } catch (err) {
+          alert('Erro ao processar assinatura. Entre em contato pelo WhatsApp (71) 99706-9291.');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Gerar Pagamento Seguro via Asaas';
+        }
+      });
+    }
+
+    const btnCopyPix = document.getElementById('checkoutBtnCopyPix');
+    if (btnCopyPix) {
+      btnCopyPix.addEventListener('click', async () => {
+        const text = document.getElementById('checkoutPixCodeText').value;
+        try {
+          await navigator.clipboard.writeText(text);
+          btnCopyPix.textContent = 'Código PIX Copiado!';
+          setTimeout(() => {
+            btnCopyPix.textContent = 'Copiar Código PIX';
+          }, 3000);
+        } catch (_) {
+          alert('Código PIX: ' + text);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
