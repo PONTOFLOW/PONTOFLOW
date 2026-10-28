@@ -101,7 +101,7 @@ const showInitialSetup = () => {
         <input id="setupAdminPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="Mínimo 10 caracteres">
       </label>
       <label>Nome da empresa
-        <input id="setupCompanyName" required value="Grupo House 190">
+        <input id="setupCompanyName" required value="PontoFlow">
       </label>
       <button class="btn btn-primary login-submit" type="submit">Criar sistema</button>
       <p id="setupInitialError" class="login-error hidden"></p>
@@ -136,9 +136,13 @@ const showInitialSetup = () => {
     } catch (failure) {
       const message =
         failure?.message || "Não foi possível concluir a configuração.";
-      error.textContent = /PERMISSION_DENIED|permission[- ]denied/i.test(message)
-        ? "O Firebase bloqueou o banco. Publique database.rules.json no Realtime Database e clique novamente em Criar sistema."
-        : message;
+      if (/configuration-not-found/i.test(message)) {
+        error.textContent = "O Firebase Authentication precisa ser ativado no console: acesse Authentication > Primeiros passos e ative E-mail/senha.";
+      } else if (/PERMISSION_DENIED|permission[- ]denied/i.test(message)) {
+        error.textContent = "O Firebase bloqueou o banco. Publique database.rules.json no Realtime Database e clique novamente em Criar sistema.";
+      } else {
+        error.textContent = message;
+      }
       error.classList.remove("hidden");
       button.disabled = false;
       button.textContent = "Criar sistema";

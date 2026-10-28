@@ -1636,11 +1636,13 @@
     } catch (err) {
       console.error("Falha no login:", err);
       const message = String(err?.message || err || "Não foi possível entrar.");
-      loginError(
-        message.includes("not a function")
-          ? "O login por senha ainda não está instalado no backend. Adicione loginUser() em Users.gs."
-          : message,
-      );
+      let userFriendlyMessage = message;
+      if (message.includes("configuration-not-found")) {
+        userFriendlyMessage = "O Firebase Authentication precisa ser ativado no console: acesse Authentication > Primeiros passos e ative E-mail/senha.";
+      } else if (message.includes("not a function")) {
+        userFriendlyMessage = "O login por senha ainda não está instalado no backend. Adicione loginUser() em Users.gs.";
+      }
+      loginError(userFriendlyMessage);
     } finally {
       setLoading(false);
       releaseFormSubmission_($("#loginForm"));
