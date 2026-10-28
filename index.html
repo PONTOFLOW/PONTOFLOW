@@ -24331,13 +24331,13 @@ dialog#medicalCertificateDialog {
         <div class="login-brand-panel" aria-hidden="true">
           <div class="login-brand-content">
             <div class="brand-mark-wrap" style="margin-bottom: 24px;">
-              <div class="brand-mark"><span class="material-symbols-rounded">skillet</span></div>
+              <div class="brand-mark"><span class="material-symbols-rounded">fingerprint</span></div>
             </div>
-            <strong class="login-group-name">Grupo House 190</strong>
-            <span class="eyebrow">PORTAL INTERNO DE EQUIPES</span>
-            <h1>Bora fazer<br />um bom dia.</h1>
+            <strong class="login-group-name">PontoFlow Pro</strong>
+            <span class="eyebrow">SISTEMA INTELIGENTE DE PONTO ELETRÔNICO</span>
+            <h1>Ponto simples.<br />100% em dia.</h1>
             <p>
-              Ponto, escalas, folgas e tarefas operacionais. Entre para acompanhar sua jornada e cuidar de cada turno.
+              Portaria 671 MTE, escalas inteligentes, folgas, banco de horas e gestão de equipes em tempo real.
             </p>
             <div class="login-feature">
               <span class="material-symbols-rounded">assignment_ind</span><span>Gestão integrada de todas as unidades</span>
@@ -24349,17 +24349,17 @@ dialog#medicalCertificateDialog {
               <span class="material-symbols-rounded">task_alt</span><span>Tarefas com fotos comprobatórias</span>
             </div>
             <div class="login-feature">
-              <span class="material-symbols-rounded">storefront</span><span>Loja de recompensas da equipe</span>
+              <span class="material-symbols-rounded">verified_user</span><span>Conformidade jurídica integral</span>
             </div>
           </div>
         </div>
         <div class="login-form-panel">
           <form id="loginForm" class="login-card">
             <div class="mobile-login-brand">
-              <div class="brand-mark brand-mark--sm"><span class="material-symbols-rounded">skillet</span></div>
+              <div class="brand-mark brand-mark--sm"><span class="material-symbols-rounded">fingerprint</span></div>
               <div class="login-brand-copy">
-                <strong>Grupo House 190</strong>
-                <span>Folgas 3.0</span>
+                <strong>PontoFlow Pro</strong>
+                <span>Gestão Inteligente de Ponto</span>
               </div>
               <div class="login-status-badge ms-auto"><span class="status-pulse-dot"></span> Online</div>
             </div>
@@ -24426,8 +24426,60 @@ dialog#medicalCertificateDialog {
               </svg>
               <span>Entrar com Conta Google</span>
             </button>
+            <div style="margin-top: 14px; text-align: center;">
+              <button type="button" id="btnGoToSetup" class="btn btn-ghost" style="font-size: 13px; color: var(--primary, #2563eb); text-decoration: underline; width: 100%;">Primeiro acesso? Configurar Administrador</button>
+            </div>
             <p id="loginError" class="login-error hidden"></p>
-            <p class="login-version">Folgas 3.0 &middot; CozinhaFlow v1.5.0 &middot; <button type="button" id="forcePwaUpdateBtn" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;">Atualizar PWA</button> &middot; <button type="button" onclick="openPrivacyPolicyDialog()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;">Privacidade (LGPD)</button></p>
+            <p class="login-version">PontoFlow Pro v1.0 &middot; Sistema Inteligente de Ponto &middot; <button type="button" id="forcePwaUpdateBtn" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;">Atualizar PWA</button> &middot; <button type="button" onclick="openPrivacyPolicyDialog()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;">Privacidade (LGPD)</button></p>
+          </form>
+          <form id="firebaseInitialSetupForm" class="login-card hidden">
+            <div class="mobile-login-brand">
+              <div class="brand-mark brand-mark--sm"><span class="material-symbols-rounded">fingerprint</span></div>
+              <div class="login-brand-copy">
+                <strong>PontoFlow Pro</strong>
+                <span>Configuração Inicial</span>
+              </div>
+              <div class="login-status-badge ms-auto"><span class="status-pulse-dot"></span> Online</div>
+            </div>
+            <span class="eyebrow">
+              <span class="material-symbols-rounded eyebrow-icon">admin_panel_settings</span>
+              PRIMEIRO ACESSO
+            </span>
+            <h2>Crie o administrador</h2>
+            <p class="login-subtext">
+              Esta etapa aparece apenas uma vez. O primeiro acesso será o Administrador Geral da conta.
+            </p>
+            <label for="setupAdminName" class="form-label-wrap">
+              <span>Nome completo</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">person</span>
+                <input id="setupAdminName" autocomplete="name" required placeholder="Nome do administrador" />
+              </div>
+            </label>
+            <label for="setupAdminEmail" class="form-label-wrap">
+              <span>E-mail</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">mail</span>
+                <input id="setupAdminEmail" type="email" autocomplete="username" required value="glleucekk77@gmail.com" placeholder="admin@suaempresa.com" />
+              </div>
+            </label>
+            <label for="setupAdminPassword" class="form-label-wrap">
+              <span>Senha master</span>
+              <div class="input-icon password-field">
+                <span class="material-symbols-rounded">lock</span>
+                <input id="setupAdminPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="Mínimo 10 caracteres" />
+              </div>
+            </label>
+            <label for="setupCompanyName" class="form-label-wrap">
+              <span>Nome da empresa</span>
+              <div class="input-icon">
+                <span class="material-symbols-rounded">business</span>
+                <input id="setupCompanyName" required value="PontoFlow" placeholder="Nome da empresa" />
+              </div>
+            </label>
+            <button class="btn btn-primary login-submit btn-glow" type="submit">Criar sistema</button>
+            <button type="button" id="btnBackToLoginCard" class="btn btn-ghost" style="width: 100%; margin-top: 8px; font-size: 13px;">Voltar ao login</button>
+            <p id="setupInitialError" class="login-error hidden"></p>
           </form>
           <form id="resetPasswordForm" class="login-card hidden">
             <button
@@ -24526,9 +24578,9 @@ dialog#medicalCertificateDialog {
     <div id="app" class="app-shell hidden">
       <aside id="sidebar" class="sidebar">
         <div class="sidebar-head">
-          <div class="brand-logo" aria-label="Grupo House 190"></div>
+          <div class="brand-logo" aria-label="PontoFlow Pro"></div>
           <div class="brand-copy">
-            <strong>Folgas 3.0</strong><span>Grupo House 190</span>
+            <strong>PontoFlow Pro</strong><span>Gestão Inteligente de RH</span>
           </div>
           <button id="sidebarToggle" class="icon-btn" aria-label="Fechar menu">
             ✕
@@ -24594,7 +24646,7 @@ dialog#medicalCertificateDialog {
           <div class="topbar-left">
             <button id="mobileMenu" class="icon-btn mobile-only">☰</button>
             <div>
-              <p id="breadcrumb">Grupo House 190 / Início</p>
+              <p id="breadcrumb">PontoFlow / Início</p>
               <h1 id="pageTitle">Início</h1>
             </div>
           </div>
@@ -26314,7 +26366,7 @@ dialog#medicalCertificateDialog {
               <div>
                 <span class="eyebrow">INTEGRAÇÃO & MENSAGERIA</span>
                 <h2>Conexão WhatsApp</h2>
-                <p>Painel oficial de notificações ativas, comunicados em massa e automações do Grupo House 190.</p>
+                <p>Painel oficial de notificações ativas, comunicados em massa e automações do PontoFlow Pro.</p>
               </div>
               <button id="refreshWhatsAppStatusBtn" type="button" class="btn btn-secondary" style="min-height:42px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
@@ -26427,7 +26479,7 @@ dialog#medicalCertificateDialog {
                       </label>
                       <label>
                         Mensagem de Teste
-                        <input id="waTestMessageInput" type="text" required value="Teste de comunicação e disparo oficial do sistema Grupo House 190 via WhatsApp." style="min-height:44px; border-radius:12px;" />
+                        <input id="waTestMessageInput" type="text" required value="Teste de comunicação e disparo oficial do sistema PontoFlow via WhatsApp." style="min-height:44px; border-radius:12px;" />
                       </label>
                     </div>
                     <div style="display:flex; justify-content:flex-end;">
@@ -32539,7 +32591,7 @@ dialog#medicalCertificateDialog {
     });
     const active = activeNav?.querySelector("b");
     $("#pageTitle").textContent = active?.textContent || ({notifications:"Avisos e lembretes",governance:"Delegações",whistleblower:"Canal de Denúncias"}[view]) || "Jornada";
-    $("#breadcrumb").textContent = "Grupo House 190 / " + $("#pageTitle").textContent;
+    $("#breadcrumb").textContent = "PontoFlow / " + $("#pageTitle").textContent;
     document.body.classList.remove("menu-open");
     renderCurrentView(view);
     if (!state.coreReady)
@@ -36810,7 +36862,7 @@ dialog#medicalCertificateDialog {
     const store = arr(state.stores).find(
       (s) => String(s.LojaID || "") === String(record.LojaID || ""),
     ) || {
-      NomeLoja: record.NomeLoja || state.profile?.NomeLoja || "Grupo House 190",
+      NomeLoja: record.NomeLoja || state.profile?.NomeLoja || "PontoFlow",
       CNPJ: "12.345.678/0001-90",
     };
 
@@ -36834,7 +36886,7 @@ dialog#medicalCertificateDialog {
     if (contentEl) {
       contentEl.innerHTML = `
         <div style="background: var(--bg-hover, #f8fafc); border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
-          <div><strong style="color: var(--text-primary, #0f172a); font-size: 14px;">${esc(store.NomeLoja || "Grupo House 190")}</strong></div>
+          <div><strong style="color: var(--text-primary, #0f172a); font-size: 14px;">${esc(store.NomeLoja || "PontoFlow")}</strong></div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
             <div><span style="color: var(--text-muted, #64748b);">Empregado:</span> <strong>${esc(record.NomeFuncionario || employee.Nome)}</strong></div>
             <div><span style="color: var(--text-muted, #64748b);">Identificação:</span> <strong>${esc(employee.CPF || employee.FuncionarioID || "Cadastrado")}</strong></div>

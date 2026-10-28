@@ -3468,7 +3468,7 @@
     });
     const active = activeNav?.querySelector("b");
     $("#pageTitle").textContent = active?.textContent || ({notifications:"Avisos e lembretes",governance:"Delegações",whistleblower:"Canal de Denúncias"}[view]) || "Jornada";
-    $("#breadcrumb").textContent = "Grupo House 190 / " + $("#pageTitle").textContent;
+    $("#breadcrumb").textContent = "PontoFlow / " + $("#pageTitle").textContent;
     document.body.classList.remove("menu-open");
     renderCurrentView(view);
     if (!state.coreReady)
@@ -7739,7 +7739,7 @@
     const store = arr(state.stores).find(
       (s) => String(s.LojaID || "") === String(record.LojaID || ""),
     ) || {
-      NomeLoja: record.NomeLoja || state.profile?.NomeLoja || "Grupo House 190",
+      NomeLoja: record.NomeLoja || state.profile?.NomeLoja || "PontoFlow",
       CNPJ: "12.345.678/0001-90",
     };
 
@@ -7763,7 +7763,7 @@
     if (contentEl) {
       contentEl.innerHTML = `
         <div style="background: var(--bg-hover, #f8fafc); border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
-          <div><strong style="color: var(--text-primary, #0f172a); font-size: 14px;">${esc(store.NomeLoja || "Grupo House 190")}</strong></div>
+          <div><strong style="color: var(--text-primary, #0f172a); font-size: 14px;">${esc(store.NomeLoja || "PontoFlow")}</strong></div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
             <div><span style="color: var(--text-muted, #64748b);">Empregado:</span> <strong>${esc(record.NomeFuncionario || employee.Nome)}</strong></div>
             <div><span style="color: var(--text-muted, #64748b);">Identificação:</span> <strong>${esc(employee.CPF || employee.FuncionarioID || "Cadastrado")}</strong></div>

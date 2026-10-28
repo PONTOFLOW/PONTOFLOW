@@ -4,7 +4,7 @@
  */
 export const BRAND = {
   productName: "PontoFlow Pro",
-  companyName: "Grupo House 190",
+  companyName: "PontoFlow",
   shortName: "PontoFlow",
   monogram: "P",
   primary: "#1B365D",

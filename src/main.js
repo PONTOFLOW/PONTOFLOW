@@ -53,14 +53,14 @@ const setupShell = (content) => {
     <div class="login-shell">
       <div class="login-brand-panel">
         <div class="login-brand-content">
-          <div class="brand-logo login-logo" aria-label="Grupo House 190"></div>
-          <strong class="login-group-name">Grupo House 190</strong>
+          <div class="brand-logo login-logo" aria-label="PontoFlow Pro">P</div>
+          <strong class="login-group-name">PontoFlow Pro</strong>
           <span class="eyebrow">INSTALAÇÃO FIREBASE</span>
           <h1>Seu sistema.<br>Agora independente.</h1>
-          <p>Versão preparada para GitHub Pages, Firebase Authentication e Realtime Database.</p>
-          <div class="login-feature"><i>✓</i><span>Sem Google Apps Script</span></div>
+          <p>Instância independente com Ponto Eletrônico (Portaria 671 MTE), Escala de Folgas e Gestão de RH.</p>
+          <div class="login-feature"><i>✓</i><span>Sem dependência de servidores caros</span></div>
           <div class="login-feature"><i>✓</i><span>Publicação automática pelo GitHub</span></div>
-          <div class="login-feature"><i>✓</i><span>Plano gratuito Spark</span></div>
+          <div class="login-feature"><i>✓</i><span>Isolamento total e autônomo</span></div>
         </div>
       </div>
       <div class="login-form-panel">${content}</div>
@@ -84,42 +84,24 @@ const showConfigurationRequired = (problems) => {
     </div>`);
 };
 
-const showInitialSetup = () => {
-  hideApplicationSurfaces();
-  const section = setupShell(`
-    <form id="firebaseInitialSetupForm" class="login-card">
-      <span class="eyebrow">PRIMEIRO ACESSO</span>
-      <h2>Crie o administrador</h2>
-      <p>Esta etapa aparece uma única vez. O primeiro acesso será o administrador do sistema.</p>
-      <label>Nome completo
-        <input id="setupAdminName" autocomplete="name" required placeholder="Nome do administrador">
-      </label>
-      <label>E-mail
-        <input id="setupAdminEmail" type="email" autocomplete="username" required placeholder="admin@suaempresa.com">
-      </label>
-      <label>Senha
-        <input id="setupAdminPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="Mínimo 10 caracteres">
-      </label>
-      <label>Nome da empresa
-        <input id="setupCompanyName" required value="PontoFlow">
-      </label>
-      <button class="btn btn-primary login-submit" type="submit">Criar sistema</button>
-      <p id="setupInitialError" class="login-error hidden"></p>
-    </form>`);
-  const form = section.querySelector("#firebaseInitialSetupForm");
+const bindSetupForm = (form) => {
+  if (!form || form.__bound) return;
+  form.__bound = true;
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = form.querySelector('button[type="submit"]');
     const error = form.querySelector("#setupInitialError");
-    error.classList.add("hidden");
-    button.disabled = true;
-    button.textContent = "Criando estrutura…";
+    error?.classList.add("hidden");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Criando estrutura…";
+    }
     try {
       await runtime.setupInitialAdmin({
-        name: form.querySelector("#setupAdminName").value,
-        email: form.querySelector("#setupAdminEmail").value,
-        password: form.querySelector("#setupAdminPassword").value,
-        company: form.querySelector("#setupCompanyName").value,
+        name: form.querySelector("#setupAdminName")?.value,
+        email: form.querySelector("#setupAdminEmail")?.value,
+        password: form.querySelector("#setupAdminPassword")?.value,
+        company: form.querySelector("#setupCompanyName")?.value,
       });
       const token = await runtime.auth.currentUser.getIdToken();
       if (typeof window.storeSessionToken_ === "function") {
@@ -137,18 +119,78 @@ const showInitialSetup = () => {
       const message =
         failure?.message || "Não foi possível concluir a configuração.";
       if (/configuration-not-found/i.test(message)) {
-        error.textContent = "O Firebase Authentication precisa ser ativado no console: acesse Authentication > Primeiros passos e ative E-mail/senha.";
+        if (error) error.textContent = "O Firebase Authentication precisa ser ativado no console: acesse Authentication > Primeiros passos e ative E-mail/senha.";
       } else if (/PERMISSION_DENIED|permission[- ]denied/i.test(message)) {
-        error.textContent = "O Firebase bloqueou o banco. Publique database.rules.json no Realtime Database e clique novamente em Criar sistema.";
+        if (error) error.textContent = "O Firebase bloqueou o banco. Publique database.rules.json no Realtime Database e clique novamente em Criar sistema.";
       } else {
-        error.textContent = message;
+        if (error) error.textContent = message;
       }
-      error.classList.remove("hidden");
-      button.disabled = false;
-      button.textContent = "Criar sistema";
+      error?.classList.remove("hidden");
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Criar sistema";
+      }
     }
   });
 };
+
+const showInitialSetup = () => {
+  const loginScreen = document.querySelector("#loginScreen");
+  const loginForm = document.querySelector("#loginForm");
+  const setupForm = document.querySelector("#firebaseInitialSetupForm");
+  const loadingOverlay = document.querySelector("#loadingOverlay");
+
+  loadingOverlay?.classList.add("hidden");
+  if (loginScreen && setupForm && loginForm) {
+    loginScreen.classList.remove("hidden");
+    loginForm.classList.add("hidden");
+    setupForm.classList.remove("hidden");
+    bindSetupForm(setupForm);
+  } else {
+    hideApplicationSurfaces();
+    const section = setupShell(`
+      <form id="firebaseInitialSetupForm" class="login-card">
+        <span class="eyebrow">PRIMEIRO ACESSO</span>
+        <h2>Crie o administrador</h2>
+        <p>Esta etapa aparece uma única vez. O primeiro acesso será o administrador do sistema.</p>
+        <label>Nome completo
+          <input id="setupAdminName" autocomplete="name" required placeholder="Nome do administrador">
+        </label>
+        <label>E-mail
+          <input id="setupAdminEmail" type="email" autocomplete="username" required value="glleucekk77@gmail.com" placeholder="admin@suaempresa.com">
+        </label>
+        <label>Senha
+          <input id="setupAdminPassword" type="password" autocomplete="new-password" minlength="10" required placeholder="Mínimo 10 caracteres">
+        </label>
+        <label>Nome da empresa
+          <input id="setupCompanyName" required value="PontoFlow">
+        </label>
+        <button class="btn btn-primary login-submit" type="submit">Criar sistema</button>
+        <p id="setupInitialError" class="login-error hidden"></p>
+      </form>`);
+    bindSetupForm(section.querySelector("#firebaseInitialSetupForm"));
+  }
+};
+
+waitForDom().then(() => {
+  const setupForm = document.querySelector("#firebaseInitialSetupForm");
+  if (setupForm) bindSetupForm(setupForm);
+
+  const btnGoToSetup = document.querySelector("#btnGoToSetup");
+  const btnBack = document.querySelector("#btnBackToLoginCard");
+  const loginForm = document.querySelector("#loginForm");
+
+  btnGoToSetup?.addEventListener("click", () => {
+    loginForm?.classList.add("hidden");
+    setupForm?.classList.remove("hidden");
+    document.querySelector("#setupAdminName")?.focus();
+  });
+
+  btnBack?.addEventListener("click", () => {
+    setupForm?.classList.add("hidden");
+    loginForm?.classList.remove("hidden");
+  });
+});
 
 const problems = firebaseConfigurationProblems();
 if (problems.length) {
